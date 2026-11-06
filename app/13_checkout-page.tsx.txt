@@ -1,0 +1,9 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import PageShell from "../components/PageShell";
+import { useCart } from "../components/CartContext";
+export default function CheckoutPage(){
+ const [payment,setPayment]=useState("UPI"); const [submitted,setSubmitted]=useState(false); const { items, count, shipping, total, clear }=useCart();
+ return <PageShell title="Checkout">{submitted?<div className="success-card"><div>✓</div><h2>Checkout preview complete!</h2><p>No real order or payment was created. Backend integration will enable secure order placement.</p></div>:<div className="checkout-layout"><section className="form-card"><h2>Delivery address</h2><div className="form-grid"><label>Full name<input placeholder="Your name"/></label><label>Mobile number<input placeholder="10-digit mobile number"/></label><label className="wide">Address<input placeholder="House / street / area"/></label><label>City<input placeholder="City"/></label><label>PIN code<input placeholder="6-digit PIN code"/></label></div><h2 className="form-subhead">Payment method</h2>{["UPI","Credit / Debit card","Cash on Delivery"].map(p=><label className="payment-choice" key={p}><input type="radio" checked={payment===p} onChange={()=>setPayment(p)}/>{p}</label>)}</section><aside className="summary-card"><h2>Order summary</h2><p>Items <b>{count}</b></p><p>Delivery <b>{shipping===0?"Free":`₹${shipping}`}</b></p><hr/><h3>Payable <strong>₹{total}</strong></h3><button className="solid-action full-action" disabled={items.length===0} onClick={()=>{setSubmitted(true);clear();}}>Place demo order</button>{items.length===0&&<small className="muted">Your bag is empty. <Link href="/products">Shop now</Link></small>}<small className="muted">Demo only — no payment will be processed.</small></aside></div>}</PageShell>;
+}
