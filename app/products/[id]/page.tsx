@@ -3,10 +3,10 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { Heart, ShoppingCart, Truck, ShieldCheck, RotateCcw, Star } from "lucide-react";
 import PageShell from "../../components/PageShell";
-import { products } from "../../components/ProductGrid";
+import { useProducts } from "../../components/useProducts";
 import { useCart } from "../../components/CartContext";
 export default function ProductDetail(){
- const params=useParams(); const product=products.find(p=>p.id===Number(params.id))||products[0];
+ const params=useParams(); const { products }=useProducts(); const product=products.find(p=>p.id===Number(params.id))||products[0];
  const [size,setSize]=useState("M"); const [liked,setLiked]=useState(false); const [added,setAdded]=useState(false); const { add }=useCart();
  return <PageShell title="Product details"><div className="detail-layout">
   <img className="detail-image" src={`https://images.unsplash.com/${product.image}?auto=format&fit=crop&w=1000&q=90`} alt={product.name}/>
