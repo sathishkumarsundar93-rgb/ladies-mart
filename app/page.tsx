@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useCart } from "./components/CartContext";
+import { useProducts } from "./components/useProducts";
 import {
   Search, UserRound, Heart, ShoppingCart, ChevronDown, ChevronRight,
   Truck, ShieldCheck, Headset, PackageCheck, Menu, X, SlidersHorizontal,
@@ -19,7 +20,7 @@ const categories = [
   { name: "Nightwear", image: "photo-1551488831-00ddcb6c6bd3" },
 ];
 
-const products = [
+const staticProducts = [
   { id: 1, name: "Designer Festive Saree", category: "Sarees", price: 799, old: 1999, off: "60% OFF", rating: "4.8", image: "photo-1610030469983-98e550d6193c", tag: "Bestseller" },
   { id: 2, name: "Everyday Printed Kurti", category: "Kurtis", price: 499, old: 1199, off: "58% OFF", rating: "4.7", image: "photo-1583391733956-6c78276477e8", tag: "Trending" },
   { id: 3, name: "Floral Midi Dress", category: "Dresses", price: 649, old: 1599, off: "59% OFF", rating: "4.6", image: "photo-1539008835657-9e8e9680c956", tag: "New" },
@@ -35,13 +36,20 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [wishlist, setWishlist] = useState<number[]>([]);
   const { count, add } = useCart();
+  const { products: apiProducts } = useProducts();
+  const products = useMemo(() => apiProducts.map((p) => ({
+    ...p,
+    category: p.cat,
+    rating: staticProducts.find((s) => s.id === p.id)?.rating ?? "4.8",
+    tag: staticProducts.find((s) => s.id === p.id)?.tag ?? "New",
+  })), [apiProducts]);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [notice, setNotice] = useState("");
 
   const visibleProducts = useMemo(() => products.filter((p) =>
     (activeCategory === "All" || p.category === activeCategory) &&
     `${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase())
-  ), [activeCategory, query]);
+  ), [products, activeCategory, query]);
 
   const toggleWishlist = (id: number) => {
     setWishlist((old) => old.includes(id) ? old.filter((x) => x !== id) : [...old, id]);
