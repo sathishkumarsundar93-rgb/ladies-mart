@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useCart } from "./components/CartContext";
 import { useProducts } from "./components/useProducts";
+import { imageUrl } from "../lib/image";
 import {
   Search, UserRound, Heart, ShoppingCart, ChevronDown, ChevronRight,
   Truck, ShieldCheck, Headset, PackageCheck, Menu, X, SlidersHorizontal,
@@ -29,7 +30,7 @@ const staticProducts = [
   { id: 6, name: "Embroidered Ethnic Set", category: "Ethnic Wear", price: 1199, old: 2499, off: "52% OFF", rating: "4.9", image: "photo-1594633312681-425c7b97ccd1", tag: "Premium" },
 ];
 
-const img = (id: string, w = 700) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=85`;
+const img = (id: string, w = 700) => imageUrl(id, w);
 
 export default function Home() {
   const [query, setQuery] = useState("");
@@ -150,4 +151,4 @@ export default function Home() {
       {notice && <div className="toast">{notice}</div>}
     </main>
   );
-}
+                                                        }
