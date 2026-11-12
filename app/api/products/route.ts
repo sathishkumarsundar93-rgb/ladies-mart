@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   try {
     const { rows } = await pool.query<DbProduct>(
       `SELECT * FROM products
-       WHERE active = TRUE
+       WHERE active = TRUE AND approval = 'approved'
          AND ($1::text IS NULL OR category = $1)
          AND ($2::text IS NULL OR name ILIKE '%' || $2 || '%')
        ORDER BY id`,
