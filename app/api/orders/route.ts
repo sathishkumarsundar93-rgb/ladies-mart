@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pool } from "../../../lib/db";
 import { shippingFor } from "../../../lib/shipping";
+import { getUserId } from "../../../lib/userAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -75,9 +76,9 @@ export async function POST(req: Request) {
     const total = subtotal + shipping;
 
     const o = await client.query(
-      `INSERT INTO orders (customer_name, phone, address, city, pincode, payment_method, subtotal, shipping, total)
-       VALUES ($1,$2,$3,$4,$5,'COD',$6,$7,$8) RETURNING id`,
-      [name, phone, address, city, pincode, subtotal, shipping, total]
+      `INSERT INTO orders (customer_name, phone, address, city, pincode, payment_method, subtotal, shipping, total, user_id)
+       VALUES ($1,$2,$3,$4,$5,'COD',$6,$7,$8,$9) RETURNING id`,
+      [name, phone, address, city, pincode, subtotal, shipping, total, getUserId()]
     );
     const orderId: number = o.rows[0].id;
     const orderNo = `LM${1000 + orderId}`;
@@ -108,4 +109,22 @@ export async function POST(req: Request) {
 
 function bad(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+// Logged-in customer's own orders
+export async function GET() {
+  const uid = getUserId();
+  if (!uid) return NextResponse.json({ error: "Please login" }, { status: 401 });
+  try {
+    const { rows } = await pool.query(
+      `SELECT o.order_no, o.total, o.status, o.created_at,
+              COALESCE(json_agg(json_build_object('name', i.name, 'size', i.size, 'qty', i.qty))
+                FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+       FROM orders o LEFT JOIN order_items i ON i.order_id = o.id
+       WHERE o.user_id = $1 GROUP BY o.id ORDER BY o.id DESC LIMIT 50`, [uid]);
+    return NextResponse.json({ orders: rows });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }
