@@ -1,154 +1,166 @@
 "use client";
-
-import { useMemo, useState } from "react";
+import "./home.css";
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "./components/CartContext";
-import { useProducts } from "./components/useProducts";
+import { useProducts, type Product } from "./components/useProducts";
 import { imageUrl } from "../lib/image";
-import {
-  Search, UserRound, Heart, ShoppingCart, ChevronDown, ChevronRight,
-  Truck, ShieldCheck, Headset, PackageCheck, Menu, X, SlidersHorizontal,
-  Star, ArrowRight, Sparkles
-} from "lucide-react";
 
-const categories = [
-  { name: "Sarees", image: "photo-1610030469983-98e550d6193c" },
-  { name: "Kurtis", image: "photo-1583391733956-6c78276477e8" },
-  { name: "Dresses", image: "photo-1539008835657-9e8e9680c956" },
-  { name: "Tops", image: "photo-1566206091558-7f218b696731" },
-  { name: "Jeans", image: "photo-1541099649105-f69ad21f3246" },
-  { name: "Ethnic Wear", image: "photo-1594633312681-425c7b97ccd1" },
-  { name: "Nightwear", image: "photo-1551488831-00ddcb6c6bd3" },
+const CATS: [string, string, string][] = [
+  ["Sarees", "#c60058", "🥻"], ["Kurtis", "#e8458b", "👗"], ["Dresses", "#a24fb5", "💃"], ["Tops", "#d9788f", "👚"],
+  ["Jeans", "#4c6ea8", "👖"], ["Ethnic Wear", "#b8325f", "✨"], ["Nightwear", "#7b5ea7", "🌙"],
 ];
-
-const staticProducts = [
-  { id: 1, name: "Designer Festive Saree", category: "Sarees", price: 799, old: 1999, off: "60% OFF", rating: "4.8", image: "photo-1610030469983-98e550d6193c", tag: "Bestseller" },
-  { id: 2, name: "Everyday Printed Kurti", category: "Kurtis", price: 499, old: 1199, off: "58% OFF", rating: "4.7", image: "photo-1583391733956-6c78276477e8", tag: "Trending" },
-  { id: 3, name: "Floral Midi Dress", category: "Dresses", price: 649, old: 1599, off: "59% OFF", rating: "4.6", image: "photo-1539008835657-9e8e9680c956", tag: "New" },
-  { id: 4, name: "Elegant Casual Top", category: "Tops", price: 399, old: 999, off: "60% OFF", rating: "4.5", image: "photo-1566206091558-7f218b696731", tag: "Popular" },
-  { id: 5, name: "Classic Wide-Leg Jeans", category: "Jeans", price: 899, old: 1799, off: "50% OFF", rating: "4.7", image: "photo-1541099649105-f69ad21f3246", tag: "Bestseller" },
-  { id: 6, name: "Embroidered Ethnic Set", category: "Ethnic Wear", price: 1199, old: 2499, off: "52% OFF", rating: "4.9", image: "photo-1594633312681-425c7b97ccd1", tag: "Premium" },
+const BANNERS = [
+  { t: "Festive saree sale", s: "Up to 60% off on sarees", bg: "linear-gradient(120deg,#c60058,#7a0a3c)", href: "/products?category=Sarees" },
+  { t: "Kurtis from ₹299", s: "Daily wear that feels good", bg: "linear-gradient(120deg,#a24fb5,#5b1b6d)", href: "/products?category=Kurtis" },
+  { t: "Night wear under ₹399", s: "Soft cotton, all sizes", bg: "linear-gradient(120deg,#e8458b,#c60058)", href: "/products?category=Nightwear" },
 ];
-
-const img = (id: string, w = 700) => imageUrl(id, w);
+const OCCASIONS: [string, string][] = [["Daily wear", "Kurtis"], ["Office", "Tops"], ["Festive", "Sarees"], ["Party", "Dresses"], ["Wedding", "Ethnic Wear"], ["Night wear", "Nightwear"]];
+const PRICES = [299, 499, 799, 999];
+const WA = process.env.NEXT_PUBLIC_WHATSAPP;
+const off = (p: Product) => Math.round((1 - p.price / p.old) * 100);
 
 export default function Home() {
-  const [query, setQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [wishlist, setWishlist] = useState<number[]>([]);
+  const router = useRouter();
   const { count, add } = useCart();
-  const { products: apiProducts } = useProducts();
-  const products = useMemo(() => apiProducts.map((p) => ({
-    ...p,
-    category: p.cat,
-    rating: staticProducts.find((s) => s.id === p.id)?.rating ?? "4.8",
-    tag: staticProducts.find((s) => s.id === p.id)?.tag ?? "New",
-  })), [apiProducts]);
-  const [mobileMenu, setMobileMenu] = useState(false);
-  const [notice, setNotice] = useState("");
+  const { products, loading } = useProducts();
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("All");
+  const [max, setMax] = useState(0);
+  const [shown, setShown] = useState(8);
+  const [wish, setWish] = useState<number[]>([]);
+  const [toast, setToast] = useState("");
+  const [slide, setSlide] = useState(0);
+  const [left, setLeft] = useState<number[] | null>(null);
+  const sl = useRef<HTMLDivElement>(null);
+  const shop = useRef<HTMLHeadingElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const visibleProducts = useMemo(() => products.filter((p) =>
-    (activeCategory === "All" || p.category === activeCategory) &&
-    `${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase())
-  ), [products, activeCategory, query]);
+  // countdown to midnight (client only, avoids hydration mismatch)
+  useEffect(() => {
+    const tick = () => {
+      const n = new Date(), e = new Date(n); e.setHours(23, 59, 59, 999);
+      const s = Math.max(0, Math.floor((e.getTime() - n.getTime()) / 1000));
+      setLeft([Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60]);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
 
-  const toggleWishlist = (id: number) => {
-    setWishlist((old) => old.includes(id) ? old.filter((x) => x !== id) : [...old, id]);
+  // banner auto-slide
+  useEffect(() => {
+    const id = setInterval(() => {
+      const el = sl.current;
+      if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      el.scrollTo({ left: ((Math.round(el.scrollLeft / el.clientWidth) + 1) % BANNERS.length) * el.clientWidth, behavior: "smooth" });
+    }, 4500);
+    return () => clearInterval(id);
+  }, []);
+
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return products.filter((p) => (cat === "All" || p.cat === cat) && (!max || p.price <= max) && (!t || (p.name + p.cat).toLowerCase().includes(t)));
+  }, [products, cat, max, q]);
+  const deals = useMemo(() => [...products].sort((a, b) => off(b) - off(a)).slice(0, 6), [products]);
+  const fresh = useMemo(() => [...products].sort((a, b) => b.id - a.id).slice(0, 8), [products]);
+
+  const say = (m: string) => {
+    setToast(m);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setToast(""), 1600);
   };
-  const addToCart = (id: number) => {
-    const p = products.find((x) => x.id === id)!;
-    add({ id: p.id, name: p.name, cat: p.category, price: p.price, old: p.old, image: p.image });
-    setNotice("Added to your bag");
-    window.setTimeout(() => setNotice(""), 1800);
-  };
+  const toShop = () => shop.current?.scrollIntoView({ behavior: "smooth" });
+  const pickCat = (c: string) => { setCat(c); setShown(8); toShop(); };
+  const pickMax = (v: number) => { setMax(max === v ? 0 : v); setShown(8); toShop(); };
+  const toggleWish = (id: number) => setWish((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));
+  const f2 = (n: number) => String(n).padStart(2, "0");
 
-  return (
-    <main>
-      <div className="top-strip">
-        <div className="top-inner">
-          <span><Truck size={14}/> Free shipping on orders above ₹999</span>
-          <span><ShieldCheck size={14}/> Secure payments</span>
-          <span><PackageCheck size={14}/> Easy returns</span>
-          <span className="top-right">Download App&nbsp; · &nbsp;Help Centre</span>
-        </div>
+  const card = (p: Product) => {
+    const out = p.stock !== undefined && p.stock <= 0;
+    return <article className="hm-card" key={p.id}>
+      <div className="hm-img">
+        <Link href={`/products/${p.id}`}><img loading="lazy" src={imageUrl(p.image, 400)} alt={p.name} style={out ? { opacity: 0.5 } : undefined} /></Link>
+        <span className="hm-off">{out ? "Sold out" : `${off(p)}% off`}</span>
+        <button className={`hm-wish ${wish.includes(p.id) ? "hm-on" : ""}`} onClick={() => toggleWish(p.id)} aria-label="Wishlist">{wish.includes(p.id) ? "♥" : "♡"}</button>
+      </div>
+      <div className="hm-info">
+        <Link href={`/products/${p.id}`} className="hm-nm">{p.name}</Link>
+        <div className="hm-pr"><b>₹{p.price}</b><del>₹{p.old}</del></div>
+        <div className="hm-rt">Cash on delivery</div>
+        <button className="hm-add" disabled={out} style={out ? { opacity: 0.5 } : undefined}
+          onClick={() => { add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }); say(`${p.name} added to bag`); }}>
+          {out ? "Sold out" : "Add to bag"}</button>
+      </div>
+    </article>;
+  };
+  const skeletons = (n: number) => Array.from({ length: n }, (_, i) => <div className="hm-skel" key={i} />);
+
+  return <div className="hm">
+    <div className="hm-strip">Free shipping above ₹999 · Cash on delivery · Easy returns</div>
+    <header>
+      <div className="hm-bar">
+        <Link className="hm-logo" href="/">Ladies Mart</Link>
+        <label className="hm-search">🔍<input value={q} onChange={(e) => { setQ(e.target.value); setShown(8); }}
+          onKeyDown={(e) => e.key === "Enter" && q.trim() && router.push(`/products?q=${encodeURIComponent(q.trim())}`)}
+          placeholder="Search sarees, kurtis, dresses…" aria-label="Search products" /></label>
+        <Link className="hm-cart" href="/profile" aria-label="My account">👤</Link>
+        <Link className="hm-cart" href="/cart" aria-label="Cart">🛍{count > 0 && <b>{count}</b>}</Link>
+      </div>
+    </header>
+
+    <div className="hm-cats">{[["All", "#f5a623", "🛍"] as [string, string, string], ...CATS].map(([n, c, e]) =>
+      <button key={n} className={`hm-cat ${cat === n ? "hm-on" : ""}`} onClick={() => pickCat(n)}><i style={{ background: c + "22" }}>{e}</i>{n}</button>)}</div>
+
+    <main className="hm-wrap">
+      <div className="hm-slider" ref={sl} onScroll={(e) => setSlide(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+        {BANNERS.map((b) => <div className="hm-slide" style={{ background: b.bg }} key={b.t}><h2>{b.t}</h2><p>{b.s}</p><Link href={b.href}><button>Shop now</button></Link></div>)}
+      </div>
+      <div className="hm-dots">{BANNERS.map((b, i) => <span key={b.t} className={slide === i ? "hm-on" : ""} />)}</div>
+
+      <h3 className="hm-t">Shop by price</h3>
+      <div className="hm-tiles">{PRICES.map((v) => <button key={v} className={`hm-tile ${max === v ? "hm-on" : ""}`} onClick={() => pickMax(v)}>Under<b>₹{v}</b></button>)}</div>
+
+      <section className="hm-deal">
+        <div className="hm-hd"><h3>Deal of the day</h3>
+          <div className="hm-timer">{left ? left.map((n, i) => <span key={i}>{f2(n)}</span>) : null}</div></div>
+        <div className="hm-row">{loading ? skeletons(3) : deals.map(card)}</div>
+      </section>
+
+      <h3 className="hm-t">New arrivals<Link href="/products"><small>See all</small></Link></h3>
+      <div className="hm-row" style={{ paddingRight: 0 }}>{loading ? skeletons(3) : fresh.map(card)}</div>
+
+      <h3 className="hm-t" ref={shop}>Trending for you</h3>
+      <div>{cat !== "All" && <button className="hm-fchip" onClick={() => setCat("All")}>{cat} ✕</button>}
+        {max > 0 && <button className="hm-fchip" onClick={() => setMax(0)}>Under ₹{max} ✕</button>}</div>
+      <div className="hm-grid">{loading ? skeletons(4) : list.length ? list.slice(0, shown).map(card)
+        : <p style={{ gridColumn: "1/-1", color: "var(--muted)" }}>No products found. Try another category or price.</p>}</div>
+      {list.length > shown && <button className="hm-more" onClick={() => setShown(shown + 8)}>Load more</button>}
+
+      <h3 className="hm-t">Shop by occasion</h3>
+      <div className="hm-chips">{OCCASIONS.map(([o, c]) => <Link key={o} href={`/products?category=${encodeURIComponent(c)}`}><button className="hm-chip">{o}</button></Link>)}</div>
+
+      <div className="hm-trust">
+        <div><i>💵</i><span><b>Cash on delivery</b>Pay when it arrives</span></div>
+        <div><i>↩️</i><span><b>Easy returns</b>Simple return process</span></div>
+        <div><i>🚚</i><span><b>Free shipping</b>On orders above ₹999</span></div>
+        <div><i>🔒</i><span><b>Safe checkout</b>Your details stay private</span></div>
       </div>
 
-      <header className="header">
-        <div className="header-main">
-          <button className="icon-btn mobile-only" aria-label="Open menu" onClick={() => setMobileMenu(!mobileMenu)}>{mobileMenu ? <X/> : <Menu/>}</button>
-          <a className="brand" href="#">
-            <span className="brand-mark">LM</span>
-            <span><strong>Ladies Mart</strong><small>Fashion for Every You <b>♥</b></small></span>
-          </a>
-          <div className="search-box">
-            <Search size={19}/>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search for sarees, kurtis, dresses..." />
-            <button aria-label="Search"><Search size={19}/></button>
-          </div>
-          <div className="header-actions">
-            <Link className="action-link" href="/login"><UserRound/><span>Login<br/>Sign Up</span></Link>
-            <Link className="action-link" href="/wishlist"><Heart/><span>Wishlist</span><i>{wishlist.length}</i></Link>
-            <Link className="action-link" href="/cart"><ShoppingCart/><span>Cart</span><i>{count}</i></Link>
-          </div>
-        </div>
-        <nav className={`nav ${mobileMenu ? "nav-open" : ""}`}>
-          <button className="all-categories" onClick={() => setActiveCategory("All")}><Menu size={16}/> All Categories <ChevronDown size={14}/></button>
-          {["New Arrivals", "Offers", "Sarees", "Kurtis", "Dresses", "Tops", "Jeans", "Ethnic Wear", "More"].map((item) =>
-            <button key={item} onClick={() => { setActiveCategory(categories.some(c => c.name === item) ? item : "All"); setMobileMenu(false); }}>{item}</button>
-          )}
-        </nav>
-      </header>
-
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="script">Discover your style</p>
-          <h1>Fashion that<br/><em>feels like you.</em></h1>
-          <p className="hero-sub">Fresh looks · Lovely prices · Everyday confidence</p>
-          <button className="primary-btn" onClick={() => document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" })}>Shop the collection <ArrowRight size={17}/></button>
-          <div className="hero-offer"><span>UP TO</span><strong>50%</strong><span>OFF</span></div>
-        </div>
-        <div className="hero-photo" role="img" aria-label="Women's festive fashion collection"/>
-        <div className="hero-flower">✿</div>
-      </section>
-
-      <section className="category-section section-wrap">
-        <div className="section-heading"><div><p className="eyebrow">FIND YOUR FAVOURITE</p><h2>Shop by category</h2></div><button className="text-link" onClick={() => setActiveCategory("All")}>View all <ChevronRight size={16}/></button></div>
-        <div className="category-grid">
-          {categories.map((c) => <button className={`category-card ${activeCategory === c.name ? "selected" : ""}`} key={c.name} onClick={() => {setActiveCategory(c.name); document.getElementById("shop")?.scrollIntoView({behavior:"smooth"});}}>
-            <img src={img(c.image, 300)} alt={c.name}/><span>{c.name}</span>
-          </button>)}
-        </div>
-      </section>
-
-      <section className="benefits">
-        <div><Truck/><span><b>Free Shipping</b><small>On orders above ₹999</small></span></div>
-        <div><ShieldCheck/><span><b>Secure Payments</b><small>100% safe checkout</small></span></div>
-        <div><Headset/><span><b>Friendly Support</b><small>We're here to help</small></span></div>
-        <div><PackageCheck/><span><b>Easy Returns</b><small>Simple return process</small></span></div>
-      </section>
-
-      <section className="section-wrap product-section" id="shop">
-        <div className="section-heading"><div><p className="eyebrow">HANDPICKED FOR YOU</p><h2>{activeCategory === "All" ? "Today's lovely finds" : activeCategory}</h2></div><div className="heading-tools"><span><Sparkles size={15}/> Curated styles</span><button className="filter-btn"><SlidersHorizontal size={16}/> Filter</button></div></div>
-        <div className="product-grid">
-          {visibleProducts.map((p) => <article className="product-card" key={p.id}>
-            <div className="product-image"><img src={img(p.image, 600)} alt={p.name}/><span className="discount">{p.off}</span><button className={`wish-btn ${wishlist.includes(p.id) ? "active" : ""}`} onClick={() => toggleWishlist(p.id)} aria-label="Add to wishlist"><Heart fill={wishlist.includes(p.id) ? "currentColor" : "none"}/></button><span className="product-tag">{p.tag}</span></div>
-            <div className="product-info"><p className="product-category">{p.category}</p><h3>{p.name}</h3><div className="rating"><Star size={13} fill="currentColor"/> {p.rating} <span>·</span> <small>Popular choice</small></div><div className="price-row"><strong>₹{p.price}</strong><del>₹{p.old}</del><span>{p.off}</span></div><button className="add-btn" onClick={() => addToCart(p.id)}>Add to bag <ShoppingCart size={15}/></button></div>
-          </article>)}
-          {visibleProducts.length === 0 && <div className="empty-state">No matching styles found. Try another search or category.</div>}
-        </div>
-      </section>
-
-      <section className="promo-row section-wrap">
-        <div className="promo-card promo-fashion"><div><p className="eyebrow">MADE FOR YOUR MOMENTS</p><h2>Fashion for<br/><em>every mood.</em></h2><p>From everyday comfort to celebration-ready looks.</p><button className="outline-btn" onClick={() => setActiveCategory("Ethnic Wear")}>Explore collection <ArrowRight size={15}/></button></div></div>
-        <div className="promo-card promo-gift"><div><p className="eyebrow">A LITTLE TREAT FOR YOU</p><h2>Welcome offer</h2><strong>FLAT 20% OFF</strong><p>Use code <b>HELLO20</b> on your first order</p><button className="primary-btn" onClick={() => setNotice("Offer code HELLO20 copied — apply it at checkout!")}>Shop now <ArrowRight size={15}/></button></div></div>
-      </section>
-
-      <section className="trust-section"><p className="eyebrow">THE LADIES MART PROMISE</p><h2>A little more love in every order.</h2><div className="trust-items"><span>✧ Thoughtful styles</span><span>♡ Quality you can trust</span><span>✿ Prices you'll love</span><span>☺ Support that cares</span></div></section>
-
-      <footer className="footer"><div className="footer-brand"><a className="brand" href="#"><span className="brand-mark">LM</span><span><strong>Ladies Mart</strong><small>Fashion for Every You ♥</small></span></a><p>Your everyday destination for women's fashion, from timeless ethnic wear to modern essentials.</p></div><div><b>Shop</b><a>Sarees</a><a>Kurtis</a><a>Dresses</a><a>Tops & Jeans</a></div><div><b>Customer care</b><a>Contact us</a><a>Shipping policy</a><a>Returns & exchanges</a><a>FAQs</a></div><div><b>Stay in style</b><p>Get updates on new arrivals and special offers.</p><div className="subscribe"><input placeholder="Your email address"/><button>Join</button></div></div><div className="copyright">© 2025 Ladies Mart. All rights reserved. <span>Made with ♥ for every woman.</span></div></footer>
-
-      <nav className="mobile-bottom"><button className="active"><span>⌂</span>Home</button><button onClick={() => document.getElementById("shop")?.scrollIntoView({behavior:"smooth"})}><span>▦</span>Categories</button><Link href="/wishlist"><Heart/>Wishlist</Link><Link href="/cart"><ShoppingCart/>Cart</Link><Link href="/profile"><UserRound/>Profile</Link></nav>
-      {notice && <div className="toast">{notice}</div>}
+      <div className="hm-seller"><div><h3>Sell your clothes on Ladies Mart</h3><p>Add your products, get orders, we handle the website.</p></div><Link href="/seller">Become a seller</Link></div>
     </main>
-  );
-                                                        }
+
+    <footer>
+      <div className="hm-cols">
+        <div><b>Shop</b>{["Sarees", "Kurtis", "Dresses", "Nightwear"].map((c) => <Link key={c} href={`/products?category=${c}`}>{c}</Link>)}</div>
+        <div><b>Help</b><Link href="/profile">Track order</Link><Link href="/">Returns &amp; refunds</Link><Link href="/">Shipping policy</Link><Link href="/">Contact us</Link></div>
+        <div><b>Company</b><Link href="/">About us</Link><Link href="/">Privacy policy</Link><Link href="/">Terms of use</Link><Link href="/seller">Sell with us</Link></div>
+        <div><b>Ladies Mart</b>Fashion for every you. Made in Tamil Nadu.</div>
+      </div>
+    </footer>
+
+    {WA && <a className="hm-wa" href={`https://wa.me/91${WA}`} target="_blank" rel="noopener noreferrer">💬 Chat on WhatsApp</a>}
+    {toast && <div className="hm-toast">{toast}</div>}
+  </div>;
+          }
