@@ -1,10 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import PageShell from "../components/PageShell";
+import { imageUrl } from "../../lib/image";
 
 type Item = { name: string; size: string; qty: number; price: number };
 type Order = { id: number; order_no: string; customer_name: string; phone: string; address: string; city: string; pincode: string; total: number; status: string; created_at: string; items: Item[] };
 type Prod = { id: number; name: string; category: string; price: number; old_price: number; stock: number; active: boolean };
+type SellerRow = { id: number; name: string; owner_name: string; phone: string; status: string; commission_pct: number; products: number };
+type Approval = { id: number; name: string; category: string; price: number; old_price: number; stock: number; image: string; seller: string | null };
 type Stats = { orders: number; sales: number; pending: number; lowStock: number };
 const CATS = ["Sarees", "Kurtis", "Dresses", "Tops", "Jeans", "Ethnic Wear", "Nightwear"];
 const STATUSES = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
@@ -13,7 +16,9 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState("");
-  const [tab, setTab] = useState<"orders" | "products" | "add">("orders");
+  const [tab, setTab] = useState<"orders" | "products" | "add" | "sellers" | "approvals">("orders");
+  const [sellers, setSellers] = useState<SellerRow[]>([]);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
   const [nf, setNf] = useState({ name: "", category: "Sarees", price: "", old_price: "", stock: "10", weight_g: "400" });
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,10 +27,12 @@ export default function AdminPage() {
   const [prods, setProds] = useState<Prod[]>([]);
 
   const load = useCallback(async () => {
-    const [o, p] = await Promise.all([fetch("/api/admin/orders"), fetch("/api/admin/products")]);
+    const [o, p, sl, ap] = await Promise.all([fetch("/api/admin/orders"), fetch("/api/admin/products"), fetch("/api/admin/sellers"), fetch("/api/admin/approvals")]);
     if (o.status === 401) { setAuthed(false); return; }
     if (o.ok) { const d = await o.json(); setOrders(d.orders); setStats(d.stats); }
     if (p.ok) setProds(await p.json());
+    if (sl.ok) setSellers(await sl.json());
+    if (ap.ok) setApprovals(await ap.json());
     setAuthed(true);
   }, []);
 
@@ -88,6 +95,19 @@ export default function AdminPage() {
       load(); setTab("products");
     } catch (e) { setMsg("Something went wrong: " + (e instanceof Error ? e.message : "try again")); } finally { setBusy(false); }
   }
+  async function saveSeller(s: SellerRow) {
+    const r = await fetch("/api/admin/sellers", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: s.id, status: s.status, commission_pct: s.commission_pct }) });
+    const d = await r.json();
+    setMsg(r.ok ? `${s.name} saved` : d.error || "Failed");
+    load();
+  }
+  async function decide(id: number, action: "approve" | "reject") {
+    const r = await fetch("/api/admin/approvals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
+    const d = await r.json();
+    setMsg(r.ok ? (action === "approve" ? "Product approved and live" : "Product rejected") : d.error || "Failed");
+    load();
+  }
+  const editSeller = (id: number, k: keyof SellerRow, v: string | number) => setSellers((ss) => ss.map((s) => (s.id === id ? { ...s, [k]: v } : s)));
   const edit = (id: number, k: keyof Prod, v: number | boolean) => setProds((ps) => ps.map((p) => (p.id === id ? { ...p, [k]: v } : p)));
 
   if (authed === null) return <PageShell title="Admin"><p className="muted">Loading…</p></PageShell>;
@@ -109,6 +129,8 @@ export default function AdminPage() {
       <button className={tab === "orders" ? "chosen" : ""} onClick={() => setTab("orders")}>Orders</button>
       <button className={tab === "products" ? "chosen" : ""} onClick={() => setTab("products")}>Products</button>
       <button className={tab === "add" ? "chosen" : ""} onClick={() => setTab("add")}>+ Add product</button>
+      <button className={tab === "approvals" ? "chosen" : ""} onClick={() => setTab("approvals")}>Approvals{approvals.length ? ` (${approvals.length})` : ""}</button>
+      <button className={tab === "sellers" ? "chosen" : ""} onClick={() => setTab("sellers")}>Sellers{sellers.some((s) => s.status === "pending") ? " •" : ""}</button>
       <button onClick={load}>Refresh</button>
       <button onClick={logout}>Logout</button>
     </div>
@@ -142,6 +164,38 @@ export default function AdminPage() {
       <button className="solid-action" disabled={busy} onClick={addProduct}>{busy ? "Uploading…" : "Add product"}</button>
     </section>}
 
+    {tab === "approvals" && <section className="form-card"><h2>Products waiting for approval</h2>
+      {approvals.length === 0 && <p className="muted">Nothing to approve.</p>}
+      {approvals.map((a) => <div key={a.id} style={{ display: "flex", gap: 12, borderTop: "1px solid #f3d3e1", padding: "12px 0" }}>
+        <img src={imageUrl(a.image, 200)} alt="" style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 8 }} />
+        <div style={{ flex: 1 }}>
+          <b>{a.name}</b>
+          <div className="muted">{a.category} · ₹{a.price} (MRP ₹{a.old_price}) · stock {a.stock}</div>
+          <div className="muted">Seller: {a.seller ?? "—"}</div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button className="solid-action" onClick={() => decide(a.id, "approve")}>Approve</button>
+            <button className="remove-btn" onClick={() => decide(a.id, "reject")}>Reject</button>
+          </div>
+        </div>
+      </div>)}
+    </section>}
+
+    {tab === "sellers" && <section className="form-card"><h2>Sellers</h2>
+      {sellers.length === 0 && <p className="muted">No sellers yet. Sellers register at /seller</p>}
+      {sellers.map((s) => <div key={s.id} style={{ borderTop: "1px solid #f3d3e1", padding: "12px 0" }}>
+        <b>{s.name}</b> <span className="status">{s.status}</span>
+        <div className="muted">{s.owner_name} · <a href={`tel:${s.phone}`}>{s.phone}</a> · {s.products} products</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+          <select value={s.status} onChange={(e) => editSeller(s.id, "status", e.target.value)} style={{ padding: 6 }}>
+            {["pending", "approved", "suspended"].map((x) => <option key={x}>{x}</option>)}
+          </select>
+          <label className="muted">Commission %</label>
+          <input style={num} type="number" value={s.commission_pct} onChange={(e) => editSeller(s.id, "commission_pct", Number(e.target.value))} />
+          <button className="solid-action" onClick={() => saveSeller(s)}>Save</button>
+        </div>
+      </div>)}
+    </section>}
+
     {tab === "products" && <section className="form-card"><h2>Products</h2>
       <div style={{ overflowX: "auto" }}><table><thead><tr><th>Product</th><th>Price</th><th>MRP</th><th>Stock</th><th>Live</th><th></th></tr></thead><tbody>
         {prods.map((p) => <tr key={p.id}>
@@ -155,4 +209,4 @@ export default function AdminPage() {
       </tbody></table></div>
     </section>}
   </PageShell>;
-    }
+                                                                          }
