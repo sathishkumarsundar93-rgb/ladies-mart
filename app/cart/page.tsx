@@ -2,6 +2,7 @@
 import Link from "next/link";
 import PageShell from "../components/PageShell";
 import { useCart, FREE_SHIPPING_MIN } from "../components/CartContext";
+import { imageUrl } from "../../lib/image";
 
 export default function CartPage(){
  const { items, subtotal, shipping, total, setQty, remove } = useCart();
@@ -9,7 +10,7 @@ export default function CartPage(){
  return <PageShell title="Shopping bag"><div className="checkout-layout">
   <section className="form-card"><h2>Your bag <small>({items.length} {items.length===1?"item":"items"})</small></h2>
    {items.map(i=><div className="cart-line" key={`${i.id}-${i.size}`}>
-    <img src={`https://images.unsplash.com/${i.image}?auto=format&fit=crop&w=300&q=80`} alt={i.name}/>
+    <img src={imageUrl(i.image,300)} alt={i.name}/>
     <div><b>{i.name}</b><p>Size: {i.size}</p><strong>₹{i.price*i.qty}</strong>
      <div className="quantity"><button onClick={()=>setQty(i.id,i.size,i.qty-1)}>−</button>{i.qty}<button onClick={()=>setQty(i.id,i.size,i.qty+1)}>+</button></div>
      <button className="remove-btn" onClick={()=>remove(i.id,i.size)}>Remove</button></div>
