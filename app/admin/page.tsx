@@ -52,23 +52,32 @@ export default function AdminPage() {
     load();
   }
   async function shrink(f: File): Promise<Blob> {
-    const bmp = await createImageBitmap(f);
-    const s = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
-    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
-    return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("resize failed"))), "image/jpeg", 0.85));
+    try {
+      const bmp = await createImageBitmap(f);
+      const s = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+      c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+      return await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("resize failed"))), "image/jpeg", 0.85));
+    } catch {
+      return f; // browser could not resize, send the original photo
+    }
   }
   async function addProduct() {
     setMsg("");
+    if (nf.name.trim().length < 3) { setMsg("Enter the product name"); return; }
+    if (!(Number(nf.price) >= 1)) { setMsg("Enter the selling price"); return; }
+    if (!(Number(nf.old_price) >= Number(nf.price))) { setMsg("MRP must be equal to or more than the selling price"); return; }
     if (!photo) { setMsg("Choose a product photo"); return; }
     setBusy(true);
+    setMsg("Uploading photo…");
     try {
       const fd = new FormData();
       fd.append("file", await shrink(photo), "product.jpg");
       const up = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const ud = await up.json();
       if (!up.ok) { setMsg(ud.error || "Upload failed"); return; }
+      setMsg("Saving product…");
       const r = await fetch("/api/admin/products", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: nf.name, category: nf.category, price: Number(nf.price), old_price: Number(nf.old_price),
           stock: Number(nf.stock), weight_g: Number(nf.weight_g), image: ud.url }) });
@@ -77,7 +86,7 @@ export default function AdminPage() {
       setMsg(`Product added (#${d.id})`);
       setNf({ name: "", category: "Sarees", price: "", old_price: "", stock: "10", weight_g: "400" }); setPhoto(null);
       load(); setTab("products");
-    } catch { setMsg("Something went wrong. Try again."); } finally { setBusy(false); }
+    } catch (e) { setMsg("Something went wrong: " + (e instanceof Error ? e.message : "try again")); } finally { setBusy(false); }
   }
   const edit = (id: number, k: keyof Prod, v: number | boolean) => setProds((ps) => ps.map((p) => (p.id === id ? { ...p, [k]: v } : p)));
 
@@ -103,7 +112,7 @@ export default function AdminPage() {
       <button onClick={load}>Refresh</button>
       <button onClick={logout}>Logout</button>
     </div>
-    {msg && <p className="muted">{msg}</p>}
+    {msg && tab !== "add" && <p className="muted">{msg}</p>}
 
     {tab === "orders" && <section className="form-card"><h2>Orders</h2>
       {orders.length === 0 && <p className="muted">No orders yet.</p>}
@@ -129,6 +138,7 @@ export default function AdminPage() {
         <label>Weight (grams)<input type="number" inputMode="numeric" value={nf.weight_g} onChange={(e) => setNf({ ...nf, weight_g: e.target.value })} /></label>
         <label className="wide">Photo<input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} /></label>
       </div>
+      {msg && <p style={{ color: msg.startsWith("Product added") ? "#1a7f37" : msg.endsWith("…") ? "#555" : "#c60058", fontWeight: 600 }}>{msg}</p>}
       <button className="solid-action" disabled={busy} onClick={addProduct}>{busy ? "Uploading…" : "Add product"}</button>
     </section>}
 
@@ -145,4 +155,4 @@ export default function AdminPage() {
       </tbody></table></div>
     </section>}
   </PageShell>;
-}
+    }
