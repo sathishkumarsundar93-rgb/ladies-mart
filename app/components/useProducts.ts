@@ -18,13 +18,15 @@ export const FALLBACK: Product[] = [
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>(FALLBACK);
   const [fromApi, setFromApi] = useState(false);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let alive = true;
     fetch("/api/products")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => { if (alive && Array.isArray(d) && d.length) { setProducts(d); setFromApi(true); } })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
-  return { products, fromApi };
+  return { products, fromApi, loading };
 }
