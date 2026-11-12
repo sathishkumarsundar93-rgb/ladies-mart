@@ -51,10 +51,12 @@ export async function POST(req: Request) {
     await client.query("BEGIN");
     const ids = [...new Set(list.map((l) => l.id))];
     const { rows } = await client.query(
-      "SELECT id, name, price, stock FROM products WHERE id = ANY($1::int[]) AND active = TRUE FOR UPDATE",
+      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct
+       FROM products p LEFT JOIN sellers s ON s.id = p.seller_id
+       WHERE p.id = ANY($1::int[]) AND p.active = TRUE AND p.approval = 'approved' FOR UPDATE OF p`,
       [ids]
     );
-    const byId = new Map<number, { id: number; name: string; price: number; stock: number }>(
+    const byId = new Map<number, { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number }>(
       rows.map((r) => [r.id, r])
     );
 
@@ -87,8 +89,8 @@ export async function POST(req: Request) {
     for (const l of list) {
       const p = byId.get(l.id)!;
       await client.query(
-        "INSERT INTO order_items (order_id, product_id, name, price, size, qty) VALUES ($1,$2,$3,$4,$5,$6)",
-        [orderId, p.id, p.name, p.price, l.size, l.qty]
+        "INSERT INTO order_items (order_id, product_id, name, price, size, qty, seller_id, commission_pct) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        [orderId, p.id, p.name, p.price, l.size, l.qty, p.seller_id, p.commission_pct]
       );
     }
     for (const [id, qty] of need) {
