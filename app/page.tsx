@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "./components/CartContext";
 import { useProducts, type Product } from "./components/useProducts";
 import { imageUrl } from "../lib/image";
+import { needsOptions } from "../lib/catalog";
 
 const CATS: [string, string, string][] = [
   ["Sarees", "#c60058", "🥻"], ["Kurtis", "#e8458b", "👗"], ["Dresses", "#a24fb5", "💃"], ["Tops", "#d9788f", "👚"],
@@ -90,8 +91,8 @@ export default function Home() {
         <div className="hm-pr"><b>₹{p.price}</b><del>₹{p.old}</del></div>
         <div className="hm-rt">Cash on delivery</div>
         <button className="hm-add" disabled={out} style={out ? { opacity: 0.5 } : undefined}
-          onClick={() => { add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }); say(`${p.name} added to bag`); }}>
-          {out ? "Sold out" : "Add to bag"}</button>
+          onClick={() => { if (needsOptions(p)) { router.push(`/products/${p.id}`); return; } add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }, p.sizes?.[0] ?? "M"); say(`${p.name} added to bag`); }}>
+          {out ? "Sold out" : needsOptions(p) ? "Select options" : "Add to bag"}</button>
       </div>
     </article>;
   };
@@ -163,4 +164,4 @@ export default function Home() {
     {WA && <a className="hm-wa" href={`https://wa.me/91${WA}`} target="_blank" rel="noopener noreferrer">💬 Chat on WhatsApp</a>}
     {toast && <div className="hm-toast">{toast}</div>}
   </div>;
-          }
+}
