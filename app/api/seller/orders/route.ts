@@ -9,7 +9,7 @@ export async function GET() {
   if (!s) return NextResponse.json({ error: "Please login" }, { status: 401 });
   try {
     const items = await pool.query(
-      `SELECT i.id AS item_id, i.name, i.size, i.qty, i.price, i.item_status, i.tracking,
+      `SELECT i.id AS item_id, i.name, i.size, i.color, i.qty, i.price, i.item_status, i.tracking,
               o.order_no, o.status AS order_status, o.created_at, o.customer_name, o.phone,
               o.address, o.city, o.pincode, o.payment_method
        FROM order_items i JOIN orders o ON o.id = i.order_id
