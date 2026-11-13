@@ -1,13 +1,13 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type CartItem = { id: number; name: string; cat: string; price: number; old: number; image: string; size: string; qty: number };
-type NewItem = Omit<CartItem, "size" | "qty">;
+export type CartItem = { id: number; name: string; cat: string; price: number; old: number; image: string; size: string; color: string; qty: number };
+type NewItem = Omit<CartItem, "size" | "color" | "qty">;
 type Cart = {
   items: CartItem[]; count: number; subtotal: number; shipping: number; total: number;
-  add: (p: NewItem, size?: string) => void;
-  setQty: (id: number, size: string, qty: number) => void;
-  remove: (id: number, size: string) => void;
+  add: (p: NewItem, size?: string, color?: string) => void;
+  setQty: (id: number, size: string, color: string, qty: number) => void;
+  remove: (id: number, size: string, color: string) => void;
   clear: () => void;
 };
 
@@ -21,7 +21,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try { const raw = localStorage.getItem(KEY); if (raw) setItems(JSON.parse(raw)); } catch {}
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) setItems((JSON.parse(raw) as CartItem[]).map((i) => ({ ...i, color: i.color ?? "" })));
+    } catch {}
     setReady(true);
   }, []);
   useEffect(() => {
@@ -29,14 +32,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(KEY, JSON.stringify(items)); } catch {}
   }, [items, ready]);
 
-  const same = (a: CartItem, id: number, size: string) => a.id === id && a.size === size;
-  const add: Cart["add"] = (p, size = "M") =>
-    setItems((old) => old.some((i) => same(i, p.id, size))
-      ? old.map((i) => same(i, p.id, size) ? { ...i, qty: i.qty + 1 } : i)
-      : [...old, { ...p, size, qty: 1 }]);
-  const setQty: Cart["setQty"] = (id, size, qty) =>
-    setItems((old) => qty < 1 ? old.filter((i) => !same(i, id, size)) : old.map((i) => same(i, id, size) ? { ...i, qty } : i));
-  const remove: Cart["remove"] = (id, size) => setItems((old) => old.filter((i) => !same(i, id, size)));
+  const same = (a: CartItem, id: number, size: string, color: string) => a.id === id && a.size === size && a.color === color;
+  const add: Cart["add"] = (p, size = "M", color = "") =>
+    setItems((old) => old.some((i) => same(i, p.id, size, color))
+      ? old.map((i) => same(i, p.id, size, color) ? { ...i, qty: i.qty + 1 } : i)
+      : [...old, { ...p, size, color, qty: 1 }]);
+  const setQty: Cart["setQty"] = (id, size, color, qty) =>
+    setItems((old) => qty < 1 ? old.filter((i) => !same(i, id, size, color)) : old.map((i) => same(i, id, size, color) ? { ...i, qty } : i));
+  const remove: Cart["remove"] = (id, size, color) => setItems((old) => old.filter((i) => !same(i, id, size, color)));
   const clear = () => setItems([]);
 
   const count = items.reduce((n, i) => n + i.qty, 0);
