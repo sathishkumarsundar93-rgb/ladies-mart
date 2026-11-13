@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 export type Product = {
   id: number; name: string; cat: string; price: number; old: number; image: string; off: string; stock?: number;
+  images?: string[]; sub?: string; description?: string; sizes?: string[]; colors?: string[];
 };
 
 // Shown instantly and used if the API is unreachable
