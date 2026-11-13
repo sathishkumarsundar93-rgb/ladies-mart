@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCart } from "./CartContext";
 import { useProducts, type Product } from "./useProducts";
 import { ShoppingCart, Star } from "lucide-react";
 import { imageUrl } from "../../lib/image";
+import { needsOptions } from "../../lib/catalog";
 
 export type Sort = "popular" | "low" | "high" | "discount" | "new";
 export type PriceRange = "all" | "u500" | "500" | "1000";
@@ -23,6 +25,7 @@ type Props = { ids?: number[]; category?: string; q?: string; sort?: Sort; price
 
 export default function ProductGrid({ ids, category, q = "", sort = "popular", price = "all" }: Props) {
   const { add } = useCart();
+  const router = useRouter();
   const { products: data } = useProducts();
   const term = q.trim().toLowerCase();
   const items = data.filter((p) =>
@@ -44,8 +47,8 @@ export default function ProductGrid({ ids, category, q = "", sort = "popular", p
         <div className="inner-price">₹{p.price} <del>₹{p.old}</del></div>
         <div className="inner-rating"><Star size={13} fill="currentColor" /> 4.8 rating</div>
         <button disabled={out} style={out ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-          onClick={() => add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image })}>
-          <ShoppingCart size={15} /> {out ? "Sold out" : "Add to bag"}</button></div>
+          onClick={() => needsOptions(p) ? router.push(`/products/${p.id}`) : add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }, p.sizes?.[0] ?? "M")}>
+          <ShoppingCart size={15} /> {out ? "Sold out" : needsOptions(p) ? "Select options" : "Add to bag"}</button></div>
     </article>;
   })}</div>;
- }
+}
