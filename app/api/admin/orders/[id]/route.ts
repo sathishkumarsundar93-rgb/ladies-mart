@@ -24,10 +24,26 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: "Cancelled orders cannot be reopened" }, { status: 400 });
     }
     if (status === "cancelled" && old !== "cancelled") {
-      await client.query(
-        `UPDATE products p SET stock = p.stock + x.q
-         FROM (SELECT product_id, SUM(qty)::int AS q FROM order_items WHERE order_id = $1 GROUP BY product_id) x
-         WHERE p.id = x.product_id`, [id]);
+      const its = await client.query("SELECT product_id, size, qty FROM order_items WHERE order_id = $1", [id]);
+      const touched = new Set<number>();
+      for (const it of its.rows) {
+        const pr = await client.query("SELECT stock_by_size FROM products WHERE id = $1 FOR UPDATE", [it.product_id]);
+        if (!pr.rows.length) continue;
+        const sbs: Record<string, number> = pr.rows[0].stock_by_size || {};
+        if (Object.keys(sbs).length) {
+          await client.query(
+            "UPDATE products SET stock_by_size = jsonb_set(stock_by_size, ARRAY[$2]::text[], to_jsonb($3::int)) WHERE id = $1",
+            [it.product_id, it.size, Number(sbs[it.size] ?? 0) + it.qty]);
+          touched.add(it.product_id);
+        } else {
+          await client.query("UPDATE products SET stock = stock + $1 WHERE id = $2", [it.qty, it.product_id]);
+        }
+      }
+      if (touched.size) {
+        await client.query(
+          "UPDATE products SET stock = (SELECT COALESCE(SUM(value::int), 0) FROM jsonb_each_text(stock_by_size)) WHERE id = ANY($1::int[])",
+          [[...touched]]);
+      }
     }
     await client.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
     await client.query("COMMIT");
