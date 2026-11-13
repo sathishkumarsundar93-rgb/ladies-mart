@@ -16,7 +16,7 @@ export default function CheckoutPage(){
   setError(""); setBusy(true);
   try{
    const res=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({...form,items:items.map(i=>({id:i.id,size:i.size,qty:i.qty}))})});
+    body:JSON.stringify({...form,items:items.map(i=>({id:i.id,size:i.size,color:i.color,qty:i.qty}))})});
    const data=await res.json();
    if(!res.ok){ setError(data.error||"Could not place order"); return; }
    setDone({orderNo:data.orderNo,total:data.total}); clear();
@@ -45,4 +45,4 @@ export default function CheckoutPage(){
    <button className="solid-action full-action" disabled={items.length===0||busy} onClick={place}>{busy?"Placing order…":"Place order (COD)"}</button>
    {items.length===0&&<small className="muted">Your bag is empty. <Link href="/products">Shop now</Link></small>}
   </aside></div>}</PageShell>;
-}
+  }
