@@ -13,7 +13,7 @@ type Body = {
   items?: { id?: number; size?: string; color?: string; qty?: number }[];
 };
 type Line = { id: number; size: string; color: string; qty: number };
-type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null };
+type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null; stock_by_size: Record<string, number> | null };
 
 const clean = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     await client.query("BEGIN");
     const ids = [...new Set(list.map((l) => l.id))];
     const { rows } = await client.query(
-      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors
+      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors, p.stock_by_size
        FROM products p LEFT JOIN sellers s ON s.id = p.seller_id
        WHERE p.id = ANY($1::int[]) AND p.active = TRUE AND p.approval = 'approved' FOR UPDATE OF p`,
       [ids]
@@ -61,6 +61,7 @@ export async function POST(req: Request) {
 
     // price, stock and options come from the database only
     const need = new Map<number, number>();
+    const needSize = new Map<string, number>();
     let subtotal = 0;
     for (const l of list) {
       const p = byId.get(l.id);
@@ -71,11 +72,20 @@ export async function POST(req: Request) {
         if (!p.colors.includes(l.color)) throw new BadRequest(`Please choose a colour for ${p.name}`);
       } else if (l.color) throw new BadRequest(`Invalid colour for ${p.name}`);
       need.set(l.id, (need.get(l.id) ?? 0) + l.qty);
+      needSize.set(`${l.id}|${l.size}`, (needSize.get(`${l.id}|${l.size}`) ?? 0) + l.qty);
       subtotal += p.price * l.qty;
+    }
+    const sized = (p: Prod) => !!p.stock_by_size && Object.keys(p.stock_by_size).length > 0;
+    for (const [key, qty] of needSize) {
+      const [pid, size] = key.split("|");
+      const p = byId.get(Number(pid))!;
+      if (!sized(p)) continue;
+      const avail = Number(p.stock_by_size![size] ?? 0);
+      if (avail < qty) throw new BadRequest(avail > 0 ? `Only ${avail} left in size ${size} for ${p.name}` : `Size ${size} of ${p.name} is sold out`);
     }
     for (const [id, qty] of need) {
       const p = byId.get(id)!;
-      if (p.stock < qty) throw new BadRequest(`Only ${p.stock} left for ${p.name}`);
+      if (!sized(p) && p.stock < qty) throw new BadRequest(`Only ${p.stock} left for ${p.name}`);
     }
 
     const shipping = shippingFor(subtotal);
@@ -97,8 +107,22 @@ export async function POST(req: Request) {
         [orderId, p.id, p.name, p.price, l.size, l.color, l.qty, p.seller_id, p.commission_pct]
       );
     }
+    const touched = new Set<number>();
+    for (const [key, qty] of needSize) {
+      const [pid, size] = key.split("|");
+      const p = byId.get(Number(pid))!;
+      if (!sized(p)) continue;
+      const left = Number(p.stock_by_size![size] ?? 0) - qty;
+      await client.query("UPDATE products SET stock_by_size = jsonb_set(stock_by_size, ARRAY[$2]::text[], to_jsonb($3::int)) WHERE id = $1", [p.id, size, left]);
+      touched.add(p.id);
+    }
     for (const [id, qty] of need) {
-      await client.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [qty, id]);
+      if (!sized(byId.get(id)!)) await client.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [qty, id]);
+    }
+    if (touched.size) {
+      await client.query(
+        "UPDATE products SET stock = (SELECT COALESCE(SUM(value::int), 0) FROM jsonb_each_text(stock_by_size)) WHERE id = ANY($1::int[])",
+        [[...touched]]);
     }
 
     await client.query("COMMIT");
@@ -133,4 +157,4 @@ export async function GET() {
     console.error(e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-}
+        }
