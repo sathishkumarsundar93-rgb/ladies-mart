@@ -2,17 +2,18 @@ import { NextResponse } from "next/server";
 import { pool } from "../../../lib/db";
 import { shippingFor } from "../../../lib/shipping";
 import { getUserId } from "../../../lib/userAuth";
+import { SIZES } from "../../../lib/catalog";
 
 export const dynamic = "force-dynamic";
-
-const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
 
 class BadRequest extends Error {}
 
 type Body = {
   name?: string; phone?: string; address?: string; city?: string; pincode?: string;
-  items?: { id?: number; size?: string; qty?: number }[];
+  items?: { id?: number; size?: string; color?: string; qty?: number }[];
 };
+type Line = { id: number; size: string; color: string; qty: number };
+type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null };
 
 const clean = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -35,14 +36,14 @@ export async function POST(req: Request) {
   if (raw.length === 0 || raw.length > 20) return bad("Your bag is empty");
 
   // merge duplicates + validate
-  const lines = new Map<string, { id: number; size: string; qty: number }>();
+  const lines = new Map<string, Line>();
   for (const i of raw) {
-    const id = Number(i.id), qty = Number(i.qty), size = clean(i.size);
-    if (!Number.isInteger(id) || !Number.isInteger(qty) || qty < 1 || qty > 10 || !SIZES.includes(size))
+    const id = Number(i.id), qty = Number(i.qty), size = clean(i.size), color = clean(i.color);
+    if (!Number.isInteger(id) || !Number.isInteger(qty) || qty < 1 || qty > 10 || !SIZES.includes(size) || color.length > 30)
       return bad("Invalid item in bag");
-    const k = `${id}-${size}`;
+    const k = `${id}|${size}|${color}`;
     const old = lines.get(k);
-    lines.set(k, { id, size, qty: Math.min(10, (old?.qty ?? 0) + qty) });
+    lines.set(k, { id, size, color, qty: Math.min(10, (old?.qty ?? 0) + qty) });
   }
   const list = [...lines.values()];
 
@@ -51,21 +52,24 @@ export async function POST(req: Request) {
     await client.query("BEGIN");
     const ids = [...new Set(list.map((l) => l.id))];
     const { rows } = await client.query(
-      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct
+      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors
        FROM products p LEFT JOIN sellers s ON s.id = p.seller_id
        WHERE p.id = ANY($1::int[]) AND p.active = TRUE AND p.approval = 'approved' FOR UPDATE OF p`,
       [ids]
     );
-    const byId = new Map<number, { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number }>(
-      rows.map((r) => [r.id, r])
-    );
+    const byId = new Map<number, Prod>(rows.map((r) => [r.id, r]));
 
-    // price + stock come from the database only
+    // price, stock and options come from the database only
     const need = new Map<number, number>();
     let subtotal = 0;
     for (const l of list) {
       const p = byId.get(l.id);
       if (!p) throw new BadRequest("A product in your bag is no longer available");
+      const sizes = p.sizes && p.sizes.length ? p.sizes : SIZES;
+      if (!sizes.includes(l.size)) throw new BadRequest(`Selected size is not available for ${p.name}`);
+      if (p.colors && p.colors.length) {
+        if (!p.colors.includes(l.color)) throw new BadRequest(`Please choose a colour for ${p.name}`);
+      } else if (l.color) throw new BadRequest(`Invalid colour for ${p.name}`);
       need.set(l.id, (need.get(l.id) ?? 0) + l.qty);
       subtotal += p.price * l.qty;
     }
@@ -89,8 +93,8 @@ export async function POST(req: Request) {
     for (const l of list) {
       const p = byId.get(l.id)!;
       await client.query(
-        "INSERT INTO order_items (order_id, product_id, name, price, size, qty, seller_id, commission_pct) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
-        [orderId, p.id, p.name, p.price, l.size, l.qty, p.seller_id, p.commission_pct]
+        "INSERT INTO order_items (order_id, product_id, name, price, size, color, qty, seller_id, commission_pct) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        [orderId, p.id, p.name, p.price, l.size, l.color, l.qty, p.seller_id, p.commission_pct]
       );
     }
     for (const [id, qty] of need) {
