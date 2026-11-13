@@ -5,8 +5,10 @@ export async function uploadToCloudinary(file: File): Promise<{ url?: string; er
   const key = process.env.CLOUDINARY_API_KEY;
   const secret = process.env.CLOUDINARY_API_SECRET;
   if (!cloud || !key || !secret) return { error: "Cloudinary is not configured on the server", status: 500 };
-  if (!file.type.startsWith("image/")) return { error: "Only images allowed", status: 400 };
-  if (file.size > 5 * 1024 * 1024) return { error: "Image too large (max 5 MB)", status: 400 };
+
+  const isVideo = file.type === "video/mp4" || file.type === "video/quicktime";
+  if (!isVideo && !/^image\/(jpeg|png)$/.test(file.type)) return { error: "Only JPG, PNG images or MP4 / MOV video allowed", status: 400 };
+  if (file.size > (isVideo ? 20 : 5) * 1024 * 1024) return { error: isVideo ? "Video too large (max 20 MB)" : "Image too large (max 5 MB)", status: 400 };
 
   const folder = "ladies-mart";
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -18,7 +20,7 @@ export async function uploadToCloudinary(file: File): Promise<{ url?: string; er
   fd.append("folder", folder);
   fd.append("signature", signature);
   try {
-    const r = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: "POST", body: fd });
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${isVideo ? "video" : "image"}/upload`, { method: "POST", body: fd });
     const d = await r.json();
     if (!r.ok) return { error: d?.error?.message || "Upload failed", status: 502 };
     return { url: d.secure_url, status: 200 };
@@ -26,4 +28,4 @@ export async function uploadToCloudinary(file: File): Promise<{ url?: string; er
     console.error(e);
     return { error: "Upload failed", status: 502 };
   }
-}
+    }
