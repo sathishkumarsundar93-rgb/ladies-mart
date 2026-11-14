@@ -9,7 +9,7 @@ export async function GET() {
   const s = await getSeller();
   if (!s) return NextResponse.json({ error: "Please login" }, { status: 401 });
   const { rows } = await pool.query(
-    `SELECT id, name, category, sku, price, old_price, stock, stock_by_size, active, approval, image
+    `SELECT id, name, category, sku, price, old_price, stock, stock_by_size, active, approval, reject_reason, image
      FROM products WHERE seller_id = $1 ORDER BY id DESC`, [s.id]);
   return NextResponse.json(rows);
 }
@@ -39,4 +39,4 @@ export async function POST(req: Request) {
     console.error(e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-}
+                                             }
