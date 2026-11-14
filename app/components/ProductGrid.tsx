@@ -47,8 +47,8 @@ export default function ProductGrid({ ids, category, q = "", sort = "popular", p
         <div className="inner-price">₹{p.price} <del>₹{p.old}</del></div>
         <div className="inner-rating"><Star size={13} fill="currentColor" /> 4.8 rating</div>
         <button disabled={out} style={out ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
-          onClick={() => needsOptions(p) ? router.push(`/products/${p.id}`) : add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }, p.sizes?.[0] ?? "M")}>
+          onClick={() => needsOptions(p) ? router.push(`/products/${p.id}`) : add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }, p.sizes?.[0] ?? "M", p.colors?.[0] ?? "")}>
           <ShoppingCart size={15} /> {out ? "Sold out" : needsOptions(p) ? "Select options" : "Add to bag"}</button></div>
     </article>;
   })}</div>;
-}
+    }
