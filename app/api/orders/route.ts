@@ -13,7 +13,7 @@ type Body = {
   items?: { id?: number; size?: string; color?: string; qty?: number }[];
 };
 type Line = { id: number; size: string; color: string; qty: number };
-type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null; stock_by_size: Record<string, number> | null };
+type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null; stock_by_size: Record<string, number> | null; min_qty: number | null; max_qty: number | null };
 
 const clean = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     await client.query("BEGIN");
     const ids = [...new Set(list.map((l) => l.id))];
     const { rows } = await client.query(
-      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors, p.stock_by_size
+      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors, p.stock_by_size, p.min_qty, p.max_qty
        FROM products p LEFT JOIN sellers s ON s.id = p.seller_id
        WHERE p.id = ANY($1::int[]) AND p.active = TRUE AND p.approval = 'approved' FOR UPDATE OF p`,
       [ids]
@@ -85,6 +85,8 @@ export async function POST(req: Request) {
     }
     for (const [id, qty] of need) {
       const p = byId.get(id)!;
+      if (qty > (p.max_qty ?? 10)) throw new BadRequest(`You can buy at most ${p.max_qty ?? 10} of ${p.name} in one order`);
+      if (qty < (p.min_qty ?? 1)) throw new BadRequest(`Minimum order quantity for ${p.name} is ${p.min_qty}`);
       if (!sized(p) && p.stock < qty) throw new BadRequest(`Only ${p.stock} left for ${p.name}`);
     }
 
@@ -157,4 +159,4 @@ export async function GET() {
     console.error(e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-        }
+}
