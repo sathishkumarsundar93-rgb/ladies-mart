@@ -6,7 +6,9 @@ import { imageUrl } from "../../lib/image";
 type Item = { name: string; size: string; qty: number; price: number };
 type Order = { id: number; order_no: string; customer_name: string; phone: string; address: string; city: string; pincode: string; total: number; status: string; created_at: string; items: Item[] };
 type Prod = { id: number; name: string; category: string; price: number; old_price: number; stock: number; active: boolean };
-type SellerRow = { id: number; name: string; owner_name: string; phone: string; status: string; commission_pct: number; products: number };
+type SellerRow = { id: number; name: string; owner_name: string; phone: string; status: string; commission_pct: number; products: number; kyc_status: string };
+type Full = Record<string, unknown>;
+type Modal = { kind: "product"; d: Full } | { kind: "kyc"; d: Full } | null;
 type Approval = { id: number; name: string; category: string; price: number; old_price: number; stock: number; image: string; seller: string | null };
 type Stats = { orders: number; sales: number; pending: number; lowStock: number };
 const CATS = ["Sarees", "Kurtis", "Dresses", "Tops", "Jeans", "Ethnic Wear", "Nightwear"];
@@ -18,6 +20,8 @@ export default function AdminPage() {
   const [msg, setMsg] = useState("");
   const [tab, setTab] = useState<"orders" | "products" | "add" | "sellers" | "approvals">("orders");
   const [sellers, setSellers] = useState<SellerRow[]>([]);
+  const [modal, setModal] = useState<Modal>(null);
+  const [note, setNote] = useState("");
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [nf, setNf] = useState({ name: "", category: "Sarees", price: "", old_price: "", stock: "10", weight_g: "400" });
   const [photo, setPhoto] = useState<File | null>(null);
@@ -102,11 +106,31 @@ export default function AdminPage() {
     load();
   }
   async function decide(id: number, action: "approve" | "reject") {
-    const r = await fetch("/api/admin/approvals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
+    let reason = "";
+    if (action === "reject") { reason = (window.prompt("Reason for rejection (the seller will see this)") || "").trim(); if (!reason) return; }
+    const r = await fetch("/api/admin/approvals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action, note: reason }) });
     const d = await r.json();
     setMsg(r.ok ? (action === "approve" ? "Product approved and live" : "Product rejected") : d.error || "Failed");
+    setModal(null); load();
+  }
+  async function openProduct(id: number) {
+    const r = await fetch(`/api/admin/products/${id}`);
+    if (r.ok) setModal({ kind: "product", d: await r.json() }); else setMsg("Could not load product");
+  }
+  async function openKyc(id: number) {
+    setNote("");
+    const r = await fetch(`/api/admin/sellers/${id}`);
+    if (r.ok) setModal({ kind: "kyc", d: await r.json() }); else setMsg("Could not load seller");
+  }
+  async function kycDecide(id: number, action: "verify" | "reject") {
+    const r = await fetch(`/api/admin/sellers/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, note }) });
+    const d = await r.json();
+    setMsg(r.ok ? (action === "verify" ? "KYC verified. You can approve the seller now." : "KYC rejected") : d.error || "Failed");
+    if (r.ok) setModal(null);
     load();
   }
+  const show = (v: unknown): string => v === null || v === undefined || v === "" ? "—" : Array.isArray(v) ? v.join(", ") || "—"
+    : typeof v === "object" ? Object.entries(v as Record<string, unknown>).map(([k, x]) => `${k}: ${x}`).join(" · ") || "—" : typeof v === "boolean" ? (v ? "Yes" : "No") : String(v);
   const editSeller = (id: number, k: keyof SellerRow, v: string | number) => setSellers((ss) => ss.map((s) => (s.id === id ? { ...s, [k]: v } : s)));
   const edit = (id: number, k: keyof Prod, v: number | boolean) => setProds((ps) => ps.map((p) => (p.id === id ? { ...p, [k]: v } : p)));
 
@@ -173,6 +197,7 @@ export default function AdminPage() {
           <div className="muted">{a.category} · ₹{a.price} (MRP ₹{a.old_price}) · stock {a.stock}</div>
           <div className="muted">Seller: {a.seller ?? "—"}</div>
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button className="light-action" onClick={() => openProduct(a.id)}>View details</button>
             <button className="solid-action" onClick={() => decide(a.id, "approve")}>Approve</button>
             <button className="remove-btn" onClick={() => decide(a.id, "reject")}>Reject</button>
           </div>
@@ -183,7 +208,7 @@ export default function AdminPage() {
     {tab === "sellers" && <section className="form-card"><h2>Sellers</h2>
       {sellers.length === 0 && <p className="muted">No sellers yet. Sellers register at /seller</p>}
       {sellers.map((s) => <div key={s.id} style={{ borderTop: "1px solid #f3d3e1", padding: "12px 0" }}>
-        <b>{s.name}</b> <span className="status">{s.status}</span>
+        <b>{s.name}</b> <span className="status">{s.status}</span> <span className="status">KYC: {s.kyc_status}</span>
         <div className="muted">{s.owner_name} · <a href={`tel:${s.phone}`}>{s.phone}</a> · {s.products} products</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
           <select value={s.status} onChange={(e) => editSeller(s.id, "status", e.target.value)} style={{ padding: 6 }}>
@@ -192,6 +217,7 @@ export default function AdminPage() {
           <label className="muted">Commission %</label>
           <input style={num} type="number" value={s.commission_pct} onChange={(e) => editSeller(s.id, "commission_pct", Number(e.target.value))} />
           <button className="solid-action" onClick={() => saveSeller(s)}>Save</button>
+          <button className="light-action" onClick={() => openKyc(s.id)}>Review KYC</button>
         </div>
       </div>)}
     </section>}
@@ -208,5 +234,22 @@ export default function AdminPage() {
         </tr>)}
       </tbody></table></div>
     </section>}
+    {modal && <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(40,8,30,.55)", zIndex: 50, display: "grid", placeItems: "center", padding: 14 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", color: "#3a1030", borderRadius: 16, maxWidth: 640, width: "100%", maxHeight: "88vh", overflow: "auto", padding: 18 }}>
+        {modal.kind === "kyc" && (() => { const d = modal.d; const rows: [string, string][] = [["Business", "name"], ["Owner", "owner_name"], ["Login phone", "phone"], ["Pickup address", "pickup_address"], ["City", "pickup_city"], ["PIN", "pickup_pincode"], ["Support phone", "support_phone"], ["PAN", "pan"], ["GSTIN", "gstin"], ["Account holder", "bank_holder"], ["Account number", "bank_account"], ["IFSC", "bank_ifsc"], ["UPI", "upi_id"], ["KYC status", "kyc_status"], ["Last note", "kyc_note"]];
+          return <><h2 style={{ marginTop: 0 }}>Seller KYC</h2><table style={{ width: "100%", fontSize: 14 }}><tbody>{rows.map(([l, k]) => <tr key={k} style={{ borderTop: "1px solid #f3d3e1" }}><td style={{ padding: "6px 8px 6px 0", color: "#7b6571", width: "38%" }}>{l}</td><td style={{ wordBreak: "break-word" }}>{show(d[k])}</td></tr>)}</tbody></table>
+            {d.kyc_status === "submitted" ? <><label style={{ display: "block", marginTop: 12 }}>Reason (needed only to reject)<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. PAN and account holder name do not match" /></label>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}><button className="solid-action" onClick={() => kycDecide(Number(d.id), "verify")}>Verify KYC</button><button className="remove-btn" onClick={() => kycDecide(Number(d.id), "reject")}>Reject</button></div></>
+              : <p className="muted">Nothing waiting for review.</p>}</>; })()}
+        {modal.kind === "product" && (() => { const d = modal.d; const slots = (d.image_slots ?? {}) as Record<string, string>; const ci = (d.color_images ?? {}) as Record<string, string>;
+          const rows: [string, string][] = [["Seller", "seller_name"], ["SKU", "sku"], ["Brand", "brand"], ["Category", "category"], ["Sub category", "sub_category"], ["Product type", "product_type"], ["Selling price", "price"], ["MRP", "old_price"], ["Purchase price (private)", "purchase_price"], ["HSN", "hsn"], ["GST rate", "gst_rate"], ["Sizes / stock", "stock_by_size"], ["Colours", "colors"], ["Specifications", "attributes"], ["Package contents", "package_contents"], ["Composition", "composition"], ["Model info", "model_info"], ["Keywords", "keywords"], ["Order qty min", "min_qty"], ["Order qty max", "max_qty"], ["Weight (g)", "weight_g"], ["Length cm", "pkg_length_cm"], ["Width cm", "pkg_width_cm"], ["Height cm", "pkg_height_cm"], ["Dispatch", "dispatch_time"], ["Origin", "country_of_origin"], ["Return available", "return_available"], ["Exchange available", "exchange_available"], ["Return period", "return_period"], ["Return policy", "return_policy"], ["Manufacturer / packer", "mfr_name"], ["Address", "mfr_address"], ["Declared at", "declared_at"]];
+          return <><h2 style={{ marginTop: 0 }}>{String(d.name)}</h2>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>{[...Object.entries(slots), ...Object.entries(ci)].map(([k, u]) => <figure key={k} style={{ margin: 0, textAlign: "center", fontSize: 11 }}><img src={imageUrl(u, 200)} alt={k} style={{ width: 70, height: 88, objectFit: "cover", borderRadius: 8 }} /><figcaption>{k}</figcaption></figure>)}</div>
+            <table style={{ width: "100%", fontSize: 14 }}><tbody>{rows.map(([l, k]) => <tr key={k} style={{ borderTop: "1px solid #f3d3e1" }}><td style={{ padding: "6px 8px 6px 0", color: "#7b6571", width: "38%", verticalAlign: "top" }}>{l}</td><td style={{ wordBreak: "break-word" }}>{show(d[k])}</td></tr>)}</tbody></table>
+            <p style={{ whiteSpace: "pre-wrap", fontSize: 14 }}><b>Description</b>{"\n"}{String(d.description ?? "")}</p>
+            {d.video_url ? <p><a href={String(d.video_url)} target="_blank" rel="noopener noreferrer">Watch video</a></p> : null}
+            {d.approval === "pending" && <div style={{ display: "flex", gap: 8 }}><button className="solid-action" onClick={() => decide(Number(d.id), "approve")}>Approve</button><button className="remove-btn" onClick={() => decide(Number(d.id), "reject")}>Reject</button></div>}</>; })()}
+        <button className="light-action" style={{ marginTop: 12 }} onClick={() => setModal(null)}>Close</button>
+      </div></div>}
   </PageShell>;
 }
