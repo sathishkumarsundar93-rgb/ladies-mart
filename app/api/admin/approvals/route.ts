@@ -15,12 +15,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   if (!isAdmin()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  let b: { id?: number; action?: string } = {};
+  let b: { id?: number; action?: string; note?: string } = {};
   try { b = await req.json(); } catch {}
+  const note = typeof b.note === "string" ? b.note.trim().slice(0, 200) : "";
   if (!Number.isInteger(b.id) || !["approve", "reject"].includes(String(b.action)))
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  const r = await pool.query("UPDATE products SET approval = $1 WHERE id = $2 AND approval = 'pending'",
-    [b.action === "approve" ? "approved" : "rejected", b.id]);
+  if (b.action === "reject" && !note) return NextResponse.json({ error: "Write the reason so the seller knows what to fix" }, { status: 400 });
+  const r = await pool.query(
+    "UPDATE products SET approval = $1, reject_reason = $2 WHERE id = $3 AND approval = 'pending'",
+    [b.action === "approve" ? "approved" : "rejected", b.action === "approve" ? null : note, b.id]);
   if (!r.rowCount) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true });
-                                                                       }
+}
