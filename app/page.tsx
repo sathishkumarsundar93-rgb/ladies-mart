@@ -10,7 +10,7 @@ import { needsOptions } from "../lib/catalog";
 
 const CATS: [string, string, string][] = [
   ["Sarees", "#c60058", "🥻"], ["Kurtis", "#e8458b", "👗"], ["Dresses", "#a24fb5", "💃"], ["Tops", "#d9788f", "👚"],
-  ["Jeans", "#4c6ea8", "👖"], ["Ethnic Wear", "#b8325f", "✨"], ["Nightwear", "#7b5ea7", "🌙"],
+  ["Jeans", "#4c6ea8", "👖"], ["Ethnic Wear", "#b8325f", "✨"], ["Nightwear", "#7b5ea7", "🌙"], ["Dress Material", "#8a5a9e", "🧵"],
 ];
 const BANNERS = [
   { t: "Festive saree sale", s: "Up to 60% off on sarees", bg: "linear-gradient(120deg,#c60058,#7a0a3c)", href: "/products?category=Sarees" },
@@ -91,7 +91,7 @@ export default function Home() {
         <div className="hm-pr"><b>₹{p.price}</b><del>₹{p.old}</del></div>
         <div className="hm-rt">Cash on delivery</div>
         <button className="hm-add" disabled={out} style={out ? { opacity: 0.5 } : undefined}
-          onClick={() => { if (needsOptions(p)) { router.push(`/products/${p.id}`); return; } add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }, p.sizes?.[0] ?? "M"); say(`${p.name} added to bag`); }}>
+          onClick={() => { if (needsOptions(p)) { router.push(`/products/${p.id}`); return; } add({ id: p.id, name: p.name, cat: p.cat, price: p.price, old: p.old, image: p.image }, p.sizes?.[0] ?? "M", p.colors?.[0] ?? ""); say(`${p.name} added to bag`); }}>
           {out ? "Sold out" : needsOptions(p) ? "Select options" : "Add to bag"}</button>
       </div>
     </article>;
@@ -164,4 +164,4 @@ export default function Home() {
     {WA && <a className="hm-wa" href={`https://wa.me/91${WA}`} target="_blank" rel="noopener noreferrer">💬 Chat on WhatsApp</a>}
     {toast && <div className="hm-toast">{toast}</div>}
   </div>;
-}
+                       }
