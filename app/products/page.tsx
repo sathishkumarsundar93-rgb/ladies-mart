@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import PageShell from "../components/PageShell";
 import ProductGrid, { type PriceRange, type Sort } from "../components/ProductGrid";
 
-const cats = ["All", "Sarees", "Kurtis", "Dresses", "Tops", "Jeans", "Ethnic Wear", "Nightwear"];
+const cats = ["All", "Sarees", "Kurtis", "Dresses", "Tops", "Jeans", "Ethnic Wear", "Nightwear", "Dress Material"];
 const prices: [PriceRange, string][] = [["all", "Any price"], ["u500", "Under ₹500"], ["500", "₹500 – ₹999"], ["1000", "₹1000+"]];
 
 export default function ProductsPage() {
