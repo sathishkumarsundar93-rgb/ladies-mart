@@ -18,7 +18,12 @@ export const SUBCATS: Record<string, string[]> = {Sarees:["Silk","Cotton","Desig
 export const PTYPE: Record<string, string[]> = {Sarees:["Saree with blouse piece","Plain saree","Ready-to-wear saree"],Kurtis:["Kurti","Long kurta","Tunic"],Dresses:["Dress","Gown","Jumpsuit"],Tops:["Shirt","Top","T-shirt","Tunic","Crop top"],Jeans:["Jeans","Jeggings","Trousers","Palazzo"],"Ethnic Wear":["Lehenga set","Salwar set","Palazzo set","Sharara set","Gown"],Nightwear:["Night suit","Gown","Co-ord set","Shorts set"],"Dress Material":["Unstitched dress material"]};
 export const OCC = ["Daily wear","Office","Festive","Party","Wedding","Casual"];
 export const FORM_SIZES = ["XS","S","M","L","XL","XXL"];
-export const SLOTS = (c: string): [string, string, number?][] => [["main","Main image",1],["front","Front view"],["back","Back view"],...(c=="Sarees"?[["border","Border close-up"],["pallu","Pallu"],["blouse","Blouse piece"]]:[]),["fabric","Fabric close-up"],["model","Model wearing"]];
+export const SLOTS = (c: string): [string, string, number?][] => {
+  const s: [string, string, number?][] = [["main", "Main image", 1], ["front", "Front view"], ["back", "Back view"]];
+  if (c === "Sarees") s.push(["border", "Border close-up"], ["pallu", "Pallu"], ["blouse", "Blouse piece"]);
+  s.push(["fabric", "Fabric close-up"], ["model", "Model wearing"]);
+  return s;
+};
 export const FIXED1 = (c: string) => c=="Sarees"||c=="Dress Material";
 
 export const CATEGORIES = Object.keys(SUBCATS);
@@ -27,4 +32,4 @@ export const COLOURS = HEX;
 
 // Products with several sizes or any colour need the customer to choose first
 export const needsOptions = (p: { sizes?: string[]; colors?: string[] }) =>
-  (p.sizes?.length ?? 0) > 1 || (p.colors?.length ?? 0) > 0;
+  (p.sizes?.length ?? 0) > 1 || (p.colors?.length ?? 0) > 1;
