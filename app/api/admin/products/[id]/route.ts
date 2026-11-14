@@ -4,6 +4,16 @@ import { isAdmin } from "../../../../../lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  if (!isAdmin()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const id = Number(params.id);
+  if (!Number.isInteger(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  const { rows } = await pool.query(
+    "SELECT p.*, s.name AS seller_name FROM products p LEFT JOIN sellers s ON s.id = p.seller_id WHERE p.id = $1", [id]);
+  if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(rows[0]);
+}
+
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   if (!isAdmin()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const id = Number(params.id);
@@ -22,4 +32,4 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     console.error(e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-}
+  }
