@@ -8,7 +8,7 @@ import { FIXED1, FORM_SIZES, HEX, OCC, PTYPE, SLOTS, SPEC, SUBCATS, type Spec } 
 import { DISPATCH, GST_RATES, ORIGINS, RETURN_PERIODS } from "../../lib/productForm";
 
 type Seller = { id: number; name: string; owner_name: string; phone: string; status: string; commission_pct: number };
-type Row = { id: number; name: string; category: string; sku: string | null; price: number; old_price: number; stock: number; stock_by_size: Record<string, number> | null; active: boolean; approval: string; image: string };
+type Row = { id: number; name: string; category: string; sku: string | null; price: number; old_price: number; stock: number; stock_by_size: Record<string, number> | null; active: boolean; approval: string; reject_reason: string | null; image: string };
 type Line = { item_id: number; name: string; size: string; color: string; qty: number; price: number; item_status: string; tracking: string | null;
   order_no: string; order_status: string; created_at: string; customer_name: string; phone: string; address: string; city: string; pincode: string; payment_method: string };
 type Earn = { sales: number; commission: number; payout: number; inProgress: number; commissionPct: number };
@@ -25,10 +25,12 @@ type Form = {
 type TextKey = "name" | "brand" | "sku" | "pack" | "comp" | "model" | "kw" | "stock" | "mrp" | "sell" | "buy" | "hsn" | "minq" | "maxq" | "wt" | "pl" | "pw" | "ph" | "mfr" | "mfrAddr" | "rpol" | "desc";
 type SelKey = "sub" | "ptype" | "gst" | "disp" | "origin" | "rper";
 type Draft = { id: number; title: string; data: Record<string, unknown>; updated_at: string };
-type Tab = "home" | "add" | "products" | "orders" | "earnings";
+type Tab = "home" | "add" | "products" | "orders" | "earnings" | "profile";
+type Profile = { pickup_address: string; pickup_city: string; pickup_pincode: string; support_phone: string; pan: string; gstin: string; bank_holder: string; bank_account: string; bank_ifsc: string; upi_id: string };
+const NOPROFILE: Profile = { pickup_address: "", pickup_city: "", pickup_pincode: "", support_phone: "", pan: "", gstin: "", bank_holder: "", bank_account: "", bank_ifsc: "", upi_id: "" };
 
 const STEPS = ["Basic Info", "Images & Media", "Size & Variants", "Pricing & Inventory", "Shipping & Publish"];
-const NAVI: [string, string, Tab | ""][] = [["🏠", "Seller dashboard", "home"], ["➕", "Add new product", "add"], ["📦", "My products", "products"], ["🛒", "Orders", "orders"], ["💰", "Earnings", "earnings"], ["👤", "Profile", ""], ["🔔", "Notifications", ""], ["❓", "Support", ""]];
+const NAVI: [string, string, Tab | ""][] = [["🏠", "Seller dashboard", "home"], ["➕", "Add new product", "add"], ["📦", "My products", "products"], ["🛒", "Orders", "orders"], ["💰", "Earnings", "earnings"], ["👤", "Profile", "profile"], ["🔔", "Notifications", ""], ["❓", "Support", ""]];
 const CATS = Object.keys(SUBCATS);
 
 function blank(cat = "Sarees"): Form {
@@ -119,6 +121,8 @@ export default function SellerPage() {
   const [prods, setProds] = useState<Row[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [earn, setEarn] = useState<Earn | null>(null);
+  const [pf, setPf] = useState<Profile>(NOPROFILE);
+  const [kyc, setKyc] = useState({ status: "incomplete", note: "" });
   const [track, setTrack] = useState<Record<number, string>>({});
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState<"" | "size" | "guide" | "preview">("");
@@ -146,10 +150,11 @@ export default function SellerPage() {
       const me = await (await fetch("/api/seller/auth")).json();
       setSeller(me.seller);
       if (!me.seller) return;
-      const [p, o, d] = await Promise.all([fetch("/api/seller/products"), fetch("/api/seller/orders"), fetch("/api/seller/drafts")]);
+      const [p, o, d, pr] = await Promise.all([fetch("/api/seller/products"), fetch("/api/seller/orders"), fetch("/api/seller/drafts"), fetch("/api/seller/profile")]);
       if (p.ok) setProds(await p.json());
       if (o.ok) { const x = await o.json(); setLines(x.items); setEarn(x.earnings); }
       if (d.ok) setDrafts(await d.json());
+      if (pr.ok) { const { kyc_status, kyc_note, ...rest } = await pr.json(); setPf(rest as Profile); setKyc({ status: kyc_status, note: kyc_note }); }
     } catch { setSeller(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -182,6 +187,19 @@ export default function SellerPage() {
     say(r.ok ? `${p.name} saved` : d.error || "Failed");
     load();
   }
+
+  async function saveProfile() {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/seller/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pf) });
+      const d = await r.json();
+      say(r.ok ? (d.kyc_status === "verified" ? "Profile saved" : "Saved. Our team will verify your details.") : d.error || "Could not save");
+      if (r.ok) load();
+    } catch { say("Network problem. Try again."); } finally { setBusy(false); }
+  }
+  const pfText = (k: keyof Profile, l: string, ph: string, req: boolean, extra?: { max?: number; mode?: "numeric"; upper?: boolean }) => (
+    <label>{lbl(l, req)}<input type="text" value={pf[k]} placeholder={ph} maxLength={extra?.max} inputMode={extra?.mode}
+      onChange={(e) => setPf((p) => ({ ...p, [k]: extra?.upper ? e.target.value.toUpperCase() : e.target.value }))} /></label>);
 
   function pickFile(files: FileList | null) {
     const file = files?.[0];
@@ -404,6 +422,7 @@ export default function SellerPage() {
 
         {tab === "home" && <>
           <div className="sp-hd sp-g"><div className="sp-ic">🏠</div><div><h1>Welcome, {seller.owner_name}</h1><p>Here is how your shop is doing</p></div>{approved && <button className="sp-gl" onClick={() => setTab("add")}>+ Add new product</button>}</div>
+          {kyc.status !== "verified" && <div className="sp-warn" style={{ marginTop: 14 }}>{kyc.status === "submitted" ? "Your profile and bank details are under review." : kyc.status === "rejected" ? `Profile needs changes: ${kyc.note}` : "Complete your profile (pickup address, PAN and bank details) to receive payouts."} <button className="sp-link" onClick={() => setTab("profile")}>Open profile →</button></div>}
           <div className="sp-stats" style={{ marginTop: 14 }}>
             <div className="sp-g sp-stat"><small>Orders to ship</small><b>{toShip}</b></div><div className="sp-g sp-stat"><small>Live products</small><b>{live}</b></div>
             <div className="sp-g sp-stat"><small>Waiting approval</small><b>{waiting}</b></div><div className="sp-g sp-stat"><small>Your payout so far</small><b>₹{earn?.payout ?? 0}</b></div>
@@ -429,7 +448,7 @@ export default function SellerPage() {
           {prods.length > 0 && <div style={{ overflowX: "auto" }}><table className="sp-tbl"><thead><tr><th></th><th>Product</th><th>Status</th><th>Price</th><th>MRP</th><th>Stock</th><th>Live</th><th></th></tr></thead><tbody>
             {prods.map((p) => { const sb = p.stock_by_size && Object.keys(p.stock_by_size).length ? p.stock_by_size : null; return <tr key={p.id}>
               <td><img src={imageUrl(p.image, 120)} alt="" style={{ width: 40, height: 50, objectFit: "cover", borderRadius: 8 }} /></td>
-              <td>{p.name}{p.sku && <div className="sp-mut">{p.sku}</div>}</td><td><span className="sp-chip">{p.approval}</span></td>
+              <td>{p.name}{p.sku && <div className="sp-mut">{p.sku}</div>}{p.approval === "rejected" && p.reject_reason && <div style={{ color: "#d6003f", fontSize: 12.5, fontWeight: 600 }}>Rejected: {p.reject_reason}</div>}</td><td><span className="sp-chip">{p.approval}</span></td>
               <td><input type="number" value={p.price} onChange={(e) => editRow(p.id, { price: Number(e.target.value) })} /></td>
               <td><input type="number" value={p.old_price} onChange={(e) => editRow(p.id, { old_price: Number(e.target.value) })} /></td>
               <td>{sb ? <div className="sp-sizes">{Object.keys(sb).map((z) => <label key={z} style={{ fontSize: 12 }}>{z}<input type="number" value={sb[z]} onChange={(e) => editRow(p.id, { stock_by_size: { ...sb, [z]: Number(e.target.value) } })} /></label>)}</div>
@@ -439,6 +458,24 @@ export default function SellerPage() {
           <section className="sp-g sp-card"><h2>Drafts</h2>{drafts.length === 0 && <p className="sp-mut">No saved drafts.</p>}
             {drafts.map((x) => <div className="sp-dr" key={x.id}><span><b>{x.title}</b><div className="sp-mut">{new Date(x.updated_at).toLocaleString("en-IN")}</div></span>
               <span><button className="sp-btn" style={{ padding: "6px 14px", marginRight: 8 }} onClick={() => loadDraft(x)}>Continue</button><button className="sp-ghost" style={{ padding: "6px 14px" }} onClick={() => delDraft(x.id)}>Delete</button></span></div>)}</section></>}
+
+        {tab === "profile" && <>
+          <div className="sp-hd sp-g"><div className="sp-ic">👤</div><div><h1>Profile &amp; payout details</h1><p>Needed for courier pickup and for paying you</p></div></div>
+          <div className="sp-warn" style={{ marginTop: 14, borderColor: kyc.status === "verified" ? "#11813f" : undefined, color: kyc.status === "verified" ? "#11813f" : undefined }}>
+            {kyc.status === "verified" ? "✓ Verified. If you change PAN, GSTIN or bank details they will be checked again."
+              : kyc.status === "submitted" ? "Submitted. Our team is reviewing your details."
+              : kyc.status === "rejected" ? `Needs changes: ${kyc.note}` : "Not submitted yet. Fill all fields marked * and save."}</div>
+          <section className="sp-g sp-card"><h2>Pickup address &amp; contact</h2><p className="sp-sub">Couriers collect your parcels from here.</p><div className="sp-fg">
+            <div className="sp-full">{pfText("pickup_address", "Pickup address", "Shop / house no, street, area", true, { max: 250 })}</div>
+            {pfText("pickup_city", "City", "City", true, { max: 60 })}{pfText("pickup_pincode", "PIN code", "6-digit PIN code", true, { max: 6, mode: "numeric" })}
+            {pfText("support_phone", "Phone for courier / support", "10-digit mobile number", true, { max: 10, mode: "numeric" })}</div></section>
+          <section className="sp-g sp-card"><h2>Tax details</h2><p className="sp-sub">PAN is required. GSTIN only if you are GST registered.</p><div className="sp-fg">
+            {pfText("pan", "PAN", "ABCDE1234F", true, { max: 10, upper: true })}{pfText("gstin", "GSTIN", "15-character GSTIN", false, { max: 15, upper: true })}</div></section>
+          <section className="sp-g sp-card"><h2>Bank details</h2><p className="sp-sub">Your payout goes to this account. The name must match your PAN or business name.</p><div className="sp-fg">
+            {pfText("bank_holder", "Account holder name", "Name as in bank", true, { max: 80 })}{pfText("bank_account", "Account number", "Bank account number", true, { max: 18, mode: "numeric" })}
+            {pfText("bank_ifsc", "IFSC code", "e.g. SBIN0001234", true, { max: 11, upper: true })}{pfText("upi_id", "UPI ID", "name@bank", false, { max: 60 })}</div>
+            <div className="sp-hint">PAN and account number are stored encrypted. You see only the last 4 characters after saving.</div></section>
+          <button className="sp-btn" disabled={busy} onClick={saveProfile}>{busy ? "Please wait…" : "Save profile"}</button></>}
 
         {tab === "orders" && <section className="sp-g sp-card"><h2>Orders to ship</h2>
           {lines.length === 0 && <p className="sp-mut">No orders yet.</p>}
