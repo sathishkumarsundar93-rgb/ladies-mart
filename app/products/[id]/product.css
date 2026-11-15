@@ -1,0 +1,28 @@
+.pd-slider{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:16px;background:#fff0f6}
+.pd-slider::-webkit-scrollbar{display:none}
+.pd-slide{flex:0 0 100%;scroll-snap-align:center;aspect-ratio:4/5}
+.pd-slide img{width:100%;height:100%;object-fit:cover;display:block}
+.pd-dots{display:flex;justify-content:center;gap:6px;margin:10px 0}
+.pd-dots span{width:8px;height:8px;border-radius:4px;background:#ecd4e0;transition:width .2s}
+.pd-dots span.on{width:22px;background:#c60058}
+.pd-sec{font-weight:700;color:#8a7a94;margin:16px 0 8px}
+.pd-thumbs{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.pd-thumbs::-webkit-scrollbar{display:none}
+.pd-thumb{flex:0 0 66px;text-align:center;font-size:11.5px;background:none;border:0;padding:0;cursor:pointer;color:inherit}
+.pd-thumb img{width:66px;height:84px;object-fit:cover;border-radius:8px;border:2px solid transparent;display:block;margin-bottom:3px}
+.pd-thumb.on img{border-color:#c60058}
+.pd-titlerow{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.pd-titlerow h2{margin:0}
+.pd-icons{display:flex;gap:16px;flex:none}
+.pd-icon{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:#5b4a63;cursor:pointer}
+.pd-bar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;gap:12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid #f0dbe4}
+.pd-bar button{flex:1;padding:13px;border-radius:10px;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit}
+.pd-add{background:#fff;color:#c60058;border:1.5px solid #c60058}
+.pd-buy{background:#c60058;color:#fff;border:1.5px solid #c60058}
+.pd-bar button:disabled{opacity:.5;cursor:not-allowed}
+.pd-sim{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.pd-sim::-webkit-scrollbar{display:none}
+.pd-sim a{flex:0 0 140px;text-decoration:none;color:inherit;font-size:13.5px}
+.pd-sim img{width:140px;height:175px;object-fit:cover;border-radius:10px;display:block;margin-bottom:4px}
+.pd-sim b{display:block}
+@media(prefers-reduced-motion:reduce){.pd-dots span{transition:none}}
