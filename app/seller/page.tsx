@@ -8,7 +8,7 @@ import { FIXED1, FORM_SIZES, HEX, OCC, PTYPE, SLOTS, SPEC, SUBCATS, type Spec } 
 import { DISPATCH, GST_RATES, ORIGINS, RETURN_PERIODS } from "../../lib/productForm";
 
 type Seller = { id: number; name: string; owner_name: string; phone: string; status: string; commission_pct: number };
-type Row = { id: number; name: string; category: string; sku: string | null; price: number; old_price: number; stock: number; stock_by_size: Record<string, number> | null; active: boolean; approval: string; reject_reason: string | null; image: string };
+type Row = { id: number; name: string; category: string; sku: string | null; price: number; old_price: number; stock: number; stock_by_size: Record<string, number> | null; variant_stock: Record<string, Record<string, number>> | null; active: boolean; approval: string; reject_reason: string | null; image: string };
 type Line = { item_id: number; name: string; size: string; color: string; qty: number; price: number; item_status: string; tracking: string | null;
   order_no: string; order_status: string; created_at: string; customer_name: string; phone: string; address: string; city: string; pincode: string; payment_method: string };
 type Earn = { sales: number; commission: number; payout: number; inProgress: number; commissionPct: number };
@@ -21,6 +21,7 @@ type Form = {
   mrp: string; sell: string; buy: string; hsn: string; gst: string; minq: string; maxq: string;
   wt: string; pl: string; pw: string; ph: string; disp: string; origin: string;
   ret: boolean; exch: boolean; rper: string; rpol: string; mfr: string; mfrAddr: string; decl: boolean;
+  multi: boolean; varStock: Record<string, Record<string, string>>;
 };
 type TextKey = "name" | "brand" | "sku" | "pack" | "comp" | "model" | "kw" | "stock" | "mrp" | "sell" | "buy" | "hsn" | "minq" | "maxq" | "wt" | "pl" | "pw" | "ph" | "mfr" | "mfrAddr" | "rpol" | "desc";
 type SelKey = "sub" | "ptype" | "gst" | "disp" | "origin" | "rper";
@@ -38,7 +39,7 @@ function blank(cat = "Sarees"): Form {
   SPEC[cat].forEach((s) => { if (s[2] === "n") a[s[0]] = String(s[3] ?? ""); });
   return { cat, sub: SUBCATS[cat][0], ptype: PTYPE[cat][0], name: "", brand: "", sku: "", desc: "", hl: ["", "", ""], occ: [], a, pack: "", comp: "", model: "", kw: "",
     sizes: [], stockBy: {}, stock: "", cols: [], imgs: {}, cimgs: {}, video: null, mrp: "", sell: "", buy: "", hsn: "", gst: "", minq: "1", maxq: "10",
-    wt: "", pl: "", pw: "", ph: "", disp: "", origin: "India", ret: true, exch: false, rper: "7 days", rpol: "", mfr: "", mfrAddr: "", decl: false };
+    wt: "", pl: "", pw: "", ph: "", disp: "", origin: "India", ret: true, exch: false, rper: "7 days", rpol: "", mfr: "", mfrAddr: "", decl: false, multi: false, varStock: {} };
 }
 const isCloud = (u: string) => u.startsWith("https://res.cloudinary.com/");
 const showIf = (s: Spec, a: Record<string, string>) => !s[5] || Object.entries(s[5]).every(([k, v]) => a[k] === v);
@@ -60,10 +61,11 @@ function miss(f: Form, s: number): string[] {
   if (s === 2) {
     if (fixed) { if (f.stock === "" || Number(f.stock) < 0) m.push("Available stock"); }
     else {
-      if (!f.cols.length) m.push("Colours");
+      if (f.multi) { if (f.cols.length < 2) m.push("At least 2 colours"); } else if (f.cols.length !== 1) m.push("Colour");
       if (!f.sizes.length) m.push("Sizes");
+      else if (f.multi) { if (f.cols.some((c) => f.sizes.some((z) => (f.varStock[c]?.[z] ?? "") === ""))) m.push("Stock for every colour and size"); }
       else if (f.sizes.some((z) => f.stockBy[z] === undefined || f.stockBy[z] === "")) m.push("Stock for every size");
-      if (f.cols.length > 1) { const nc = f.cols.filter((c) => !f.cimgs[c]); if (nc.length) m.push("Photo for " + nc.join(", ")); }
+      if (f.multi && f.cols.length > 1) { const nc = f.cols.filter((c) => !f.cimgs[c]); if (nc.length) m.push("Photo for " + nc.join(", ")); }
     }
   }
   if (s === 3) {
@@ -136,11 +138,18 @@ export default function SellerPage() {
   const setA = (k: string, v: string) => setF((p) => ({ ...p, a: { ...p.a, [k]: v } }));
   const toggle = (k: "occ" | "sizes" | "cols", v: string) => setF((p) => {
     const has = p[k].includes(v);
-    const next = { ...p, [k]: has ? p[k].filter((x) => x !== v) : [...p[k], v] };
-    if (has && k === "sizes") { const sb = { ...p.stockBy }; delete sb[v]; next.stockBy = sb; }
-    if (has && k === "cols") { const ci = { ...p.cimgs }; delete ci[v]; next.cimgs = ci; }
+    const single = k === "cols" && !p.multi;
+    const next = { ...p, [k]: has ? p[k].filter((x) => x !== v) : single ? [v] : [...p[k], v] };
+    if (has && k === "sizes") {
+      const sb = { ...p.stockBy }; delete sb[v]; next.stockBy = sb;
+      const vs: Record<string, Record<string, string>> = {};
+      Object.keys(p.varStock).forEach((c) => { const row = { ...p.varStock[c] }; delete row[v]; vs[c] = row; });
+      next.varStock = vs;
+    }
+    if (has && k === "cols") { const ci = { ...p.cimgs }; delete ci[v]; next.cimgs = ci; const vs = { ...p.varStock }; delete vs[v]; next.varStock = vs; }
     return next;
   });
+  const setMulti = (on: boolean) => setF((p) => ({ ...p, multi: on, cols: on ? p.cols : p.cols.slice(0, 1) }));
   const changeCat = (c: string) => setF((p) => ({ ...blank(c), name: p.name, brand: p.brand, sku: p.sku, desc: p.desc, hl: p.hl, occ: p.occ, imgs: p.imgs, video: p.video,
     mrp: p.mrp, sell: p.sell, buy: p.buy, hsn: p.hsn, gst: p.gst, minq: p.minq, maxq: p.maxq, wt: p.wt, pl: p.pl, pw: p.pw, ph: p.ph, disp: p.disp, origin: p.origin,
     ret: p.ret, exch: p.exch, rper: p.rper, rpol: p.rpol, pack: p.pack, kw: p.kw, comp: p.comp, mfr: p.mfr, mfrAddr: p.mfrAddr, decl: p.decl }));
@@ -181,8 +190,9 @@ export default function SellerPage() {
   const editRow = (id: number, patch: Partial<Row>) => setProds((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   async function saveRow(p: Row) {
     const sized = !!p.stock_by_size && Object.keys(p.stock_by_size).length > 0;
+    const varied = !!p.variant_stock && Object.keys(p.variant_stock).length > 0;
     const r = await fetch(`/api/seller/products/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ price: p.price, old_price: p.old_price, active: p.active, ...(sized ? { stock_by_size: p.stock_by_size } : { stock: p.stock }) }) });
+      body: JSON.stringify({ price: p.price, old_price: p.old_price, active: p.active, ...(varied ? { variant_stock: p.variant_stock } : sized ? { stock_by_size: p.stock_by_size } : { stock: p.stock }) }) });
     const d = await r.json();
     say(r.ok ? `${p.name} saved` : d.error || "Failed");
     load();
@@ -275,7 +285,9 @@ export default function SellerPage() {
       const r = await fetch("/api/seller/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         draftId, category: x.cat, sub_category: x.sub, product_type: x.ptype, name: x.name, brand: x.brand, sku: x.sku, description: x.desc,
         highlights: x.hl.filter(Boolean), occasion: x.occ, attributes: x.a, package_contents: x.pack, composition: x.comp, model_info: x.model, keywords: x.kw,
-        ...(fixed ? { stock: Number(x.stock) } : { stock_by_size: stockBy, colors: x.cols }),
+        ...(fixed ? { stock: Number(x.stock) } : x.multi
+          ? { variant_stock: Object.fromEntries(x.cols.map((c) => [c, Object.fromEntries(x.sizes.map((z) => [z, Number(x.varStock[c]?.[z] ?? 0)]))])), colors: x.cols }
+          : { stock_by_size: stockBy, colors: x.cols }),
         images: cloudMap(x.imgs), color_images: cloudMap(x.cimgs), video_url: x.video && isCloud(x.video.url) ? x.video.url : "",
         mrp: Number(x.mrp), price: Number(x.sell), purchase_price: x.buy === "" ? null : Number(x.buy), hsn: x.hsn, gst_rate: x.gst,
         min_qty: Number(x.minq), max_qty: Number(x.maxq), weight_kg: Number(x.wt), pkg_length_cm: Number(x.pl), pkg_width_cm: Number(x.pw), pkg_height_cm: Number(x.ph),
@@ -373,15 +385,22 @@ export default function SellerPage() {
       <div className="sp-hint">{f.video ? (f.video.file ? `Selected: ${f.video.file.name} · ` : "Video saved · ") : ""}Up to 30 seconds, max 20 MB.</div></section>;
     if (step === 2) return fixed
       ? <section className="sp-g sp-card"><h2>Size &amp; stock</h2><p className="sp-sub">{f.cat} is sold as free size, so one stock number is enough. Its colour is the Primary colour you chose in Basic Info, so there is no separate colour photo box here.</p><div className="sp-fg">{text("stock", "Available stock", "Total pieces", true, "number")}</div></section>
-      : <section className="sp-g sp-card"><h2>Size &amp; colour variants</h2><p className="sp-sub">Customers choose from these on the product page.</p>
-        <div className="sp-fw"><b>Colours <span className="sp-rq">*</span></b><div className="sp-chips sp-dots">{Object.keys(HEX).map((c) =>
+      : <section className="sp-g sp-card"><h2>Colours, sizes &amp; stock</h2><p className="sp-sub">Choose how customers will buy this design.</p>
+        <div className="sp-fw"><b>Colour options</b><div className="sp-yn" style={{ marginTop: 6 }}>
+          <button type="button" className={!f.multi ? "sp-on" : ""} onClick={() => setMulti(false)}>Single colour</button>
+          <button type="button" className={f.multi ? "sp-on" : ""} onClick={() => setMulti(true)}>Colour variants</button></div>
+          <div className="sp-hint">{f.multi ? "Same design in several colours. Each colour has its own photo and its own stock for every size. Customers see the colours as Similar Products." : "One colour only. Pick the colour and enter the stock for each size."}</div></div>
+        <div className="sp-fw" style={{ marginTop: 14 }}><b>{f.multi ? "Colours" : "Colour"} <span className="sp-rq">*</span></b><div className="sp-chips sp-dots">{Object.keys(HEX).map((c) =>
           <button type="button" key={c} title={c} aria-label={c} className={f.cols.includes(c) ? "sp-on" : ""} style={{ background: HEX[c] }} onClick={() => toggle("cols", c)} />)}</div>
-          <div className="sp-hint">{f.cols.length < 2 ? "Select 2 or more colours and a box to upload a photo for each colour will appear below." : `${f.cols.length} colours selected. Upload one photo for each colour below.`}</div></div>
+          <div className="sp-hint">{f.multi ? (f.cols.length < 2 ? "Select 2 or more colours." : `${f.cols.length} colours selected: ${f.cols.join(", ")}`) : (f.cols.length ? `Colour: ${f.cols[0]}` : "Select one colour.")}</div></div>
         <div className="sp-fw" style={{ marginTop: 14 }}><b>Available sizes <span className="sp-rq">*</span></b><div className="sp-chips">{FORM_SIZES.map((z) =>
           <button type="button" key={z} className={f.sizes.includes(z) ? "sp-on" : ""} onClick={() => toggle("sizes", z)}>{f.sizes.includes(z) ? "✓ " : ""}{z}</button>)}</div></div>
-        {f.sizes.length > 0 && <div className="sp-fw" style={{ marginTop: 14 }}><b>Stock per size <span className="sp-rq">*</span></b><div className="sp-stk" style={{ marginTop: 8 }}>{f.sizes.map((z) =>
+        {f.sizes.length > 0 && !f.multi && <div className="sp-fw" style={{ marginTop: 14 }}><b>Stock per size <span className="sp-rq">*</span></b><div className="sp-stk" style={{ marginTop: 8 }}>{f.sizes.map((z) =>
           <label key={z}>{z}<input type="number" min={0} placeholder="0" value={f.stockBy[z] ?? ""} onChange={(e) => setF((p) => ({ ...p, stockBy: { ...p.stockBy, [z]: e.target.value } }))} /></label>)}</div></div>}
-        {f.cols.length > 1 && <div className="sp-fw" style={{ marginTop: 14 }}><b>Photo for each colour <span className="sp-rq">*</span></b><div className="sp-hint">Customers must see the colour they order. Add one photo per colour.</div>
+        {f.sizes.length > 0 && f.multi && f.cols.length > 0 && <div className="sp-fw" style={{ marginTop: 14 }}><b>Stock for each colour and size <span className="sp-rq">*</span></b>
+          {f.cols.map((c) => <div className="sp-vrow" key={c}><span className="sp-vname"><i style={{ background: HEX[c] }} />{c}</span><div className="sp-stk">{f.sizes.map((z) =>
+            <label key={z}>{z}<input type="number" min={0} placeholder="0" value={f.varStock[c]?.[z] ?? ""} onChange={(e) => setF((p) => ({ ...p, varStock: { ...p.varStock, [c]: { ...(p.varStock[c] ?? {}), [z]: e.target.value } } }))} /></label>)}</div></div>)}</div>}
+        {f.multi && f.cols.length > 1 && <div className="sp-fw" style={{ marginTop: 14 }}><b>Product photo for each colour <span className="sp-rq">*</span></b><div className="sp-hint">Upload the actual photo of every colour. Customers tap a colour to see its photo.</div>
           <div className="sp-cps">{f.cols.map((c) => { const im = f.cimgs[c]; return <div className="sp-slot" key={c} role="button" tabIndex={0} onClick={() => openSlot("c:" + c)}>
             {im ? <><img src={im.url} alt={c} /><button className="sp-x" aria-label="Remove" onClick={(e) => { e.stopPropagation(); setF((p) => { const m = { ...p.cimgs }; delete m[c]; return { ...p, cimgs: m }; }); }}>✕</button><b>{c}</b></> : <span><em>＋</em>{c}</span>}</div>; })}</div></div>}
         <button className="sp-link" type="button" onClick={() => setModal("size")}>View size chart ✎</button></section>;
@@ -447,12 +466,12 @@ export default function SellerPage() {
         {tab === "products" && <><section className="sp-g sp-card"><h2>My products</h2>
           {prods.length === 0 && <p className="sp-mut">No products yet.</p>}
           {prods.length > 0 && <div style={{ overflowX: "auto" }}><table className="sp-tbl"><thead><tr><th></th><th>Product</th><th>Status</th><th>Price</th><th>MRP</th><th>Stock</th><th>Live</th><th></th></tr></thead><tbody>
-            {prods.map((p) => { const sb = p.stock_by_size && Object.keys(p.stock_by_size).length ? p.stock_by_size : null; return <tr key={p.id}>
+            {prods.map((p) => { const sb = p.stock_by_size && Object.keys(p.stock_by_size).length ? p.stock_by_size : null; const vs = p.variant_stock && Object.keys(p.variant_stock).length ? p.variant_stock : null; return <tr key={p.id}>
               <td><img src={imageUrl(p.image, 120)} alt="" style={{ width: 40, height: 50, objectFit: "cover", borderRadius: 8 }} /></td>
               <td>{p.name}{p.sku && <div className="sp-mut">{p.sku}</div>}{p.approval === "rejected" && p.reject_reason && <div style={{ color: "#d6003f", fontSize: 12.5, fontWeight: 600 }}>Rejected: {p.reject_reason}</div>}</td><td><span className="sp-chip">{p.approval}</span></td>
               <td><input type="number" value={p.price} onChange={(e) => editRow(p.id, { price: Number(e.target.value) })} /></td>
               <td><input type="number" value={p.old_price} onChange={(e) => editRow(p.id, { old_price: Number(e.target.value) })} /></td>
-              <td>{sb ? <div className="sp-sizes">{Object.keys(sb).map((z) => <label key={z} style={{ fontSize: 12 }}>{z}<input type="number" value={sb[z]} onChange={(e) => editRow(p.id, { stock_by_size: { ...sb, [z]: Number(e.target.value) } })} /></label>)}</div>
+              <td>{vs ? <div>{Object.keys(vs).map((c) => <div key={c} className="sp-sizes" style={{ marginBottom: 4 }}><b style={{ fontSize: 12, minWidth: 52 }}>{c}</b>{Object.keys(vs[c]).map((z) => <label key={z} style={{ fontSize: 12 }}>{z}<input type="number" value={vs[c][z]} onChange={(e) => editRow(p.id, { variant_stock: { ...vs, [c]: { ...vs[c], [z]: Number(e.target.value) } } })} /></label>)}</div>)}</div> : sb ? <div className="sp-sizes">{Object.keys(sb).map((z) => <label key={z} style={{ fontSize: 12 }}>{z}<input type="number" value={sb[z]} onChange={(e) => editRow(p.id, { stock_by_size: { ...sb, [z]: Number(e.target.value) } })} /></label>)}</div>
                 : <input type="number" value={p.stock} onChange={(e) => editRow(p.id, { stock: Number(e.target.value) })} />}</td>
               <td><input type="checkbox" checked={p.active} onChange={(e) => editRow(p.id, { active: e.target.checked })} /></td>
               <td><button className="sp-btn" style={{ padding: "6px 14px" }} onClick={() => saveRow(p)}>Save</button></td></tr>; })}</tbody></table></div>}</section>
