@@ -1,7 +1,9 @@
 "use client";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Heart, ShoppingCart, Truck, ShieldCheck, RotateCcw } from "lucide-react";
+import "./product.css";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Heart, Share2, Truck, ShieldCheck, RotateCcw } from "lucide-react";
 import PageShell from "../../components/PageShell";
 import Md from "../../components/Md";
 import { useProducts } from "../../components/useProducts";
@@ -10,7 +12,7 @@ import { COLOURS, SIZES, SPEC } from "../../../lib/catalog";
 import { useCart } from "../../components/CartContext";
 
 export default function ProductDetail(){
- const params=useParams(); const { products }=useProducts();
+ const params=useParams(); const router=useRouter(); const { products }=useProducts();
  const product=products.find(p=>p.id===Number(params.id))||products[0];
  const sized=!!product.sizeStock&&Object.keys(product.sizeStock).length>0;
  const sizes=product.sizes&&product.sizes.length?product.sizes:SIZES.filter(s=>s!=="Free Size");
@@ -19,26 +21,40 @@ export default function ProductDetail(){
  const out=product.stock!==undefined&&product.stock<=0;
  const [size,setSize]=useState(""); const [color,setColor]=useState(""); const [pic,setPic]=useState(0);
  const [liked,setLiked]=useState(false); const [added,setAdded]=useState(false); const [note,setNote]=useState("");
+ const slider=useRef<HTMLDivElement>(null);
  const { add }=useCart();
 
  useEffect(()=>{
   const ok=sizes.filter(s=>stockOf(s)>0);
   setSize(ok.includes("M")?"M":(ok[0]??sizes[0]));
   setColor(colors.length===1?colors[0]:""); setPic(0); setNote("");
+  slider.current?.scrollTo({left:0});
  },[product.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
  const base=product.images&&product.images.length?product.images:[product.image];
  const cImg=color?product.colorImages?.[color]:undefined;
  const gallery=cImg?[cImg,...base.filter(x=>x!==cImg)]:base;
  const left=size?stockOf(size):0;
- const mustPickColor=colors.length>1&&!color;
+ const colourPhotos=colors.length>1&&colors.every(c=>product.colorImages?.[c]);
+ const similar=products.filter(p=>p.cat===product.cat&&p.id!==product.id).slice(0,8);
 
- function addToBag(){
-  if(mustPickColor){ setNote("Please choose a colour"); return; }
+ const chooseColor=(c:string)=>{ setColor(c); setPic(0); slider.current?.scrollTo({left:0,behavior:"smooth"}); };
+ const goTo=(i:number)=>{ const el=slider.current; if(el) el.scrollTo({left:i*el.clientWidth,behavior:"smooth"}); };
+
+ function addToBag(go:boolean){
+  if(colors.length>1&&!color){ setNote("Please choose a colour"); return; }
   if(left<=0){ setNote("This size is sold out"); return; }
   setNote("");
   add({id:product.id,name:product.name,cat:product.cat,price:product.price,old:product.old,image:gallery[0]},size,colors.length===1?colors[0]:color);
+  if(go){ router.push("/checkout"); return; }
   setAdded(true); setTimeout(()=>setAdded(false),1500);
+ }
+ async function share(){
+  const url=window.location.href;
+  try{
+   if(typeof navigator.share==="function"){ await navigator.share({title:product.name,url}); return; }
+   await navigator.clipboard.writeText(url); setNote("Link copied"); setTimeout(()=>setNote(""),1800);
+  }catch{}
  }
 
  const a=product.attributes??{};
@@ -53,29 +69,46 @@ export default function ProductDetail(){
 
  return <PageShell title="Product details"><div className="detail-layout">
   <div>
-   <img className="detail-image" src={imageUrl(gallery[Math.min(pic,gallery.length-1)],1000)} alt={product.name}/>
-   {gallery.length>1&&<div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>{gallery.map((g,i)=>
-    <button key={g} onClick={()=>setPic(i)} aria-label={`Photo ${i+1}`} style={{padding:0,border:i===pic?"2px solid #c60058":"2px solid transparent",borderRadius:10,overflow:"hidden",width:64,height:80,background:"none",cursor:"pointer"}}>
-     <img src={imageUrl(g,160)} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/></button>)}</div>}
+   <div className="pd-slider" ref={slider} onScroll={e=>setPic(Math.round(e.currentTarget.scrollLeft/Math.max(1,e.currentTarget.clientWidth)))}>
+    {gallery.map((g,i)=><div className="pd-slide" key={g}><img src={imageUrl(g,900)} alt={`${product.name} photo ${i+1}`} loading={i===0?"eager":"lazy"}/></div>)}
+   </div>
+   {gallery.length>1&&<div className="pd-dots">{gallery.map((g,i)=><span key={g} className={pic===i?"on":""}/>)}</div>}
    {product.video&&<video controls playsInline preload="none" src={product.video} style={{width:"100%",marginTop:12,borderRadius:12}}/>}
+   {colors.length>1&&<>
+    <div className="pd-sec">{colors.length} Colours</div>
+    <div className="pd-thumbs">{colors.map(c=>colourPhotos
+     ?<button key={c} className={`pd-thumb ${color===c?"on":""}`} onClick={()=>chooseColor(c)} aria-label={c}><img src={imageUrl(product.colorImages![c],200)} alt={c}/>{c}</button>
+     :<button key={c} className="pd-thumb" onClick={()=>chooseColor(c)} aria-label={c} style={{flexBasis:44}}><span style={{display:"block",width:34,height:34,borderRadius:"50%",background:COLOURS[c]??"#ccc",border:"3px solid #fff",outline:color===c?"2px solid #3a1030":"1px solid #e5cdd9"}}/></button>)}</div></>}
   </div>
-  <div className="detail-copy"><small className="eyebrow">{product.cat}{product.sub?` · ${product.sub}`:""}{product.brand?` · ${product.brand}`:""}</small><h2>{product.name}</h2>
+  <div className="detail-copy"><small className="eyebrow">{product.cat}{product.sub?` · ${product.sub}`:""}{product.brand?` · ${product.brand}`:""}</small>
+   <div className="pd-titlerow"><h2>{product.name}</h2>
+    <div className="pd-icons">
+     <button className="pd-icon" onClick={()=>setLiked(!liked)} aria-label="Wishlist"><Heart fill={liked?"#c60058":"none"} color={liked?"#c60058":"currentColor"}/>Wishlist</button>
+     <button className="pd-icon" onClick={share} aria-label="Share"><Share2/>Share</button></div></div>
    <div className="detail-price">₹{product.price} <del>₹{product.old}</del><span>{product.off}</span></div>
    {product.highlights&&product.highlights.length>0&&<ul style={{margin:"8px 0",paddingLeft:20}}>{product.highlights.map(h=><li key={h}>{h}</li>)}</ul>}
    <b>Select size</b><div className="size-row">{sizes.map(s=>{const o=stockOf(s)<=0;return <button className={size===s?"chosen":""} onClick={()=>!o&&setSize(s)} key={s} disabled={o} style={o?{opacity:.4,textDecoration:"line-through"}:undefined}>{s}</button>})}</div>
    {size&&left>0&&left<=3&&<p style={{color:"#b45309",fontWeight:600,margin:"4px 0"}}>Only {left} left in this size</p>}
    {product.modelInfo&&<small className="muted">{product.modelInfo}</small>}
-   {colors.length>0&&<><b style={{display:"block",marginTop:12}}>Colour{color?`: ${color}`:colors.length===1?`: ${colors[0]}`:""}</b>
+   {colors.length===1&&<b style={{display:"block",marginTop:12}}>Colour: {colors[0]}</b>}
+   {colors.length>1&&!colourPhotos&&<><b style={{display:"block",marginTop:12}}>Colour{color?`: ${color}`:""}</b>
     <div style={{display:"flex",gap:10,margin:"8px 0",flexWrap:"wrap"}}>{colors.map(c=>
-     <button key={c} onClick={()=>{setColor(c);setPic(0);}} title={c} aria-label={c} style={{width:34,height:34,borderRadius:"50%",background:COLOURS[c]??"#ccc",border:"3px solid #fff",outline:(color===c||colors.length===1)?"2px solid #3a1030":"1px solid #e5cdd9",cursor:"pointer"}}/>)}</div></>}
+     <button key={c} onClick={()=>chooseColor(c)} title={c} aria-label={c} style={{width:34,height:34,borderRadius:"50%",background:COLOURS[c]??"#ccc",border:"3px solid #fff",outline:color===c?"2px solid #3a1030":"1px solid #e5cdd9",cursor:"pointer"}}/>)}</div></>}
+   {colourPhotos&&color&&<b style={{display:"block",marginTop:12}}>Colour: {color}</b>}
    {note&&<p style={{color:"#c60058",fontWeight:600}}>{note}</p>}
-   <div className="detail-actions"><button className="solid-action" disabled={out} onClick={addToBag}><ShoppingCart size={17}/> {out?"Sold out":added?"Added ✓":"Add to bag"}</button><button className="light-action" onClick={()=>setLiked(!liked)}><Heart fill={liked?"currentColor":"none"}/> {liked?"Saved":"Wishlist"}</button></div>
    <div className="detail-perks"><span><Truck/> Cash on delivery</span><span><ShieldCheck/> Secure checkout</span><span><RotateCcw/> {product.returnAvailable===false?"No returns":"Easy returns*"}</span></div>
    {hasReturnInfo?<small className="muted">{product.returnAvailable===false?"This item cannot be returned.":`Return within ${product.returnPeriod}.`}{product.exchangeAvailable?" Exchange available.":""}{product.returnPolicy?` ${product.returnPolicy}`:""}</small>:<small className="muted">*Return eligibility depends on product policy.</small>}
    <h3 style={{margin:"18px 0 4px"}}>About this product</h3>
    {product.description?<Md text={product.description}/>:<p className="muted">A thoughtfully selected style made to bring comfort and confidence to your wardrobe.</p>}
    {rows.length>0&&<><h3 style={{margin:"18px 0 4px"}}>Product details</h3>
     <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}><tbody>{rows.map(([k,v])=><tr key={k} style={{borderTop:"1px solid #f3d3e1"}}><td style={{padding:"7px 8px 7px 0",color:"#7b6571",width:"42%",verticalAlign:"top"}}>{k}</td><td style={{padding:"7px 0"}}>{v}</td></tr>)}</tbody></table></>}
+   {similar.length>0&&<><h3 style={{margin:"22px 0 8px"}}>Similar products</h3>
+    <div className="pd-sim">{similar.map(p=><Link key={p.id} href={`/products/${p.id}`}><img src={imageUrl(p.image,300)} alt={p.name} loading="lazy"/><span>{p.name}</span><b>₹{p.price}</b></Link>)}</div></>}
+   <div style={{height:84}}/>
   </div>
+ </div>
+ <div className="pd-bar">
+  <button className="pd-add" disabled={out} onClick={()=>addToBag(false)}>{out?"Sold out":added?"Added ✓":"Add to Cart"}</button>
+  <button className="pd-buy" disabled={out} onClick={()=>addToBag(true)}>Buy Now</button>
  </div></PageShell>;
 }
