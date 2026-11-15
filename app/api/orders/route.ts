@@ -13,7 +13,7 @@ type Body = {
   items?: { id?: number; size?: string; color?: string; qty?: number }[];
 };
 type Line = { id: number; size: string; color: string; qty: number };
-type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null; stock_by_size: Record<string, number> | null; min_qty: number | null; max_qty: number | null };
+type Prod = { id: number; name: string; price: number; stock: number; seller_id: number | null; commission_pct: number; sizes: string[] | null; colors: string[] | null; stock_by_size: Record<string, number> | null; variant_stock: Record<string, Record<string, number>> | null; min_qty: number | null; max_qty: number | null };
 
 const clean = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -52,16 +52,18 @@ export async function POST(req: Request) {
     await client.query("BEGIN");
     const ids = [...new Set(list.map((l) => l.id))];
     const { rows } = await client.query(
-      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors, p.stock_by_size, p.min_qty, p.max_qty
+      `SELECT p.id, p.name, p.price, p.stock, p.seller_id, COALESCE(s.commission_pct, 0) AS commission_pct, p.sizes, p.colors, p.stock_by_size, p.variant_stock, p.min_qty, p.max_qty
        FROM products p LEFT JOIN sellers s ON s.id = p.seller_id
        WHERE p.id = ANY($1::int[]) AND p.active = TRUE AND p.approval = 'approved' FOR UPDATE OF p`,
       [ids]
     );
     const byId = new Map<number, Prod>(rows.map((r) => [r.id, r]));
+    const varied = (p: Prod) => !!p.variant_stock && Object.keys(p.variant_stock).length > 0;
 
     // price, stock and options come from the database only
     const need = new Map<number, number>();
     const needSize = new Map<string, number>();
+    const needVar = new Map<string, number>();
     let subtotal = 0;
     for (const l of list) {
       const p = byId.get(l.id);
@@ -73,9 +75,16 @@ export async function POST(req: Request) {
       } else if (l.color) throw new BadRequest(`Invalid colour for ${p.name}`);
       need.set(l.id, (need.get(l.id) ?? 0) + l.qty);
       needSize.set(`${l.id}|${l.size}`, (needSize.get(`${l.id}|${l.size}`) ?? 0) + l.qty);
+      if (varied(p)) needVar.set(`${l.id}|${l.color}|${l.size}`, (needVar.get(`${l.id}|${l.color}|${l.size}`) ?? 0) + l.qty);
       subtotal += p.price * l.qty;
     }
-    const sized = (p: Prod) => !!p.stock_by_size && Object.keys(p.stock_by_size).length > 0;
+    for (const [key, qty] of needVar) {
+      const [pid, color, size] = key.split("|");
+      const p = byId.get(Number(pid))!;
+      const avail = Number(p.variant_stock![color]?.[size] ?? 0);
+      if (avail < qty) throw new BadRequest(avail > 0 ? `Only ${avail} left in ${color} size ${size} for ${p.name}` : `${color} size ${size} of ${p.name} is sold out`);
+    }
+    const sized = (p: Prod) => !varied(p) && !!p.stock_by_size && Object.keys(p.stock_by_size).length > 0;
     for (const [key, qty] of needSize) {
       const [pid, size] = key.split("|");
       const p = byId.get(Number(pid))!;
@@ -87,7 +96,7 @@ export async function POST(req: Request) {
       const p = byId.get(id)!;
       if (qty > (p.max_qty ?? 10)) throw new BadRequest(`You can buy at most ${p.max_qty ?? 10} of ${p.name} in one order`);
       if (qty < (p.min_qty ?? 1)) throw new BadRequest(`Minimum order quantity for ${p.name} is ${p.min_qty}`);
-      if (!sized(p) && p.stock < qty) throw new BadRequest(`Only ${p.stock} left for ${p.name}`);
+      if (!sized(p) && !varied(p) && p.stock < qty) throw new BadRequest(`Only ${p.stock} left for ${p.name}`);
     }
 
     const shipping = shippingFor(subtotal);
@@ -119,7 +128,22 @@ export async function POST(req: Request) {
       touched.add(p.id);
     }
     for (const [id, qty] of need) {
-      if (!sized(byId.get(id)!)) await client.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [qty, id]);
+      const pp = byId.get(id)!;
+      if (!sized(pp) && !varied(pp)) await client.query("UPDATE products SET stock = stock - $1 WHERE id = $2", [qty, id]);
+    }
+    const vNew = new Map<number, Record<string, Record<string, number>>>();
+    for (const [key, qty] of needVar) {
+      const [pid, color, size] = key.split("|");
+      const p = byId.get(Number(pid))!;
+      const cur = vNew.get(p.id) ?? (JSON.parse(JSON.stringify(p.variant_stock)) as Record<string, Record<string, number>>);
+      cur[color][size] = cur[color][size] - qty;
+      vNew.set(p.id, cur);
+    }
+    for (const [pid, v] of vNew) {
+      const bySize: Record<string, number> = {};
+      for (const row of Object.values(v)) for (const [z, n] of Object.entries(row)) bySize[z] = (bySize[z] ?? 0) + n;
+      const total = Object.values(bySize).reduce((a, n) => a + n, 0);
+      await client.query("UPDATE products SET variant_stock = $2::jsonb, stock_by_size = $3::jsonb, stock = $4 WHERE id = $1", [pid, JSON.stringify(v), JSON.stringify(bySize), total]);
     }
     if (touched.size) {
       await client.query(
