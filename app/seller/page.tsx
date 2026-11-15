@@ -372,10 +372,11 @@ export default function SellerPage() {
       <label style={{ marginTop: 14 }}>Product video <span className="sp-opt">optional</span><input type="file" accept="video/mp4,video/quicktime" onChange={(e) => pickVideo(e.target.files)} /></label>
       <div className="sp-hint">{f.video ? (f.video.file ? `Selected: ${f.video.file.name} · ` : "Video saved · ") : ""}Up to 30 seconds, max 20 MB.</div></section>;
     if (step === 2) return fixed
-      ? <section className="sp-g sp-card"><h2>Size &amp; stock</h2><p className="sp-sub">{f.cat} is sold as free size, so one stock number is enough.</p><div className="sp-fg">{text("stock", "Available stock", "Total pieces", true, "number")}</div></section>
+      ? <section className="sp-g sp-card"><h2>Size &amp; stock</h2><p className="sp-sub">{f.cat} is sold as free size, so one stock number is enough. Its colour is the Primary colour you chose in Basic Info, so there is no separate colour photo box here.</p><div className="sp-fg">{text("stock", "Available stock", "Total pieces", true, "number")}</div></section>
       : <section className="sp-g sp-card"><h2>Size &amp; colour variants</h2><p className="sp-sub">Customers choose from these on the product page.</p>
         <div className="sp-fw"><b>Colours <span className="sp-rq">*</span></b><div className="sp-chips sp-dots">{Object.keys(HEX).map((c) =>
-          <button type="button" key={c} title={c} aria-label={c} className={f.cols.includes(c) ? "sp-on" : ""} style={{ background: HEX[c] }} onClick={() => toggle("cols", c)} />)}</div></div>
+          <button type="button" key={c} title={c} aria-label={c} className={f.cols.includes(c) ? "sp-on" : ""} style={{ background: HEX[c] }} onClick={() => toggle("cols", c)} />)}</div>
+          <div className="sp-hint">{f.cols.length < 2 ? "Select 2 or more colours and a box to upload a photo for each colour will appear below." : `${f.cols.length} colours selected. Upload one photo for each colour below.`}</div></div>
         <div className="sp-fw" style={{ marginTop: 14 }}><b>Available sizes <span className="sp-rq">*</span></b><div className="sp-chips">{FORM_SIZES.map((z) =>
           <button type="button" key={z} className={f.sizes.includes(z) ? "sp-on" : ""} onClick={() => toggle("sizes", z)}>{f.sizes.includes(z) ? "✓ " : ""}{z}</button>)}</div></div>
         {f.sizes.length > 0 && <div className="sp-fw" style={{ marginTop: 14 }}><b>Stock per size <span className="sp-rq">*</span></b><div className="sp-stk" style={{ marginTop: 8 }}>{f.sizes.map((z) =>
