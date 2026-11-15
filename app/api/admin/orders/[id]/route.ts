@@ -24,13 +24,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: "Cancelled orders cannot be reopened" }, { status: 400 });
     }
     if (status === "cancelled" && old !== "cancelled") {
-      const its = await client.query("SELECT product_id, size, qty FROM order_items WHERE order_id = $1", [id]);
+      const its = await client.query("SELECT product_id, size, color, qty FROM order_items WHERE order_id = $1", [id]);
       const touched = new Set<number>();
       for (const it of its.rows) {
-        const pr = await client.query("SELECT stock_by_size FROM products WHERE id = $1 FOR UPDATE", [it.product_id]);
+        const pr = await client.query("SELECT stock_by_size, variant_stock FROM products WHERE id = $1 FOR UPDATE", [it.product_id]);
         if (!pr.rows.length) continue;
         const sbs: Record<string, number> = pr.rows[0].stock_by_size || {};
-        if (Object.keys(sbs).length) {
+        const vs: Record<string, Record<string, number>> = pr.rows[0].variant_stock || {};
+        if (Object.keys(vs).length) {
+          vs[it.color] = vs[it.color] || {};
+          vs[it.color][it.size] = Number(vs[it.color][it.size] ?? 0) + it.qty;
+          const bySize: Record<string, number> = {};
+          for (const row of Object.values(vs)) for (const [z, n] of Object.entries(row)) bySize[z] = (bySize[z] ?? 0) + n;
+          const total = Object.values(bySize).reduce((a, n) => a + n, 0);
+          await client.query("UPDATE products SET variant_stock = $2::jsonb, stock_by_size = $3::jsonb, stock = $4 WHERE id = $1", [it.product_id, JSON.stringify(vs), JSON.stringify(bySize), total]);
+        } else if (Object.keys(sbs).length) {
           await client.query(
             "UPDATE products SET stock_by_size = jsonb_set(stock_by_size, ARRAY[$2]::text[], to_jsonb($3::int)) WHERE id = $1",
             [it.product_id, it.size, Number(sbs[it.size] ?? 0) + it.qty]);
