@@ -5,7 +5,7 @@ export type DbProduct = {
   sizes?: string[] | null; colors?: string[] | null;
   product_type?: string | null; brand?: string | null; highlights?: string[] | null; attributes?: Record<string, string> | null;
   package_contents?: string | null; composition?: string | null; model_info?: string | null;
-  stock_by_size?: Record<string, number> | null; color_images?: Record<string, string> | null; video_url?: string | null;
+  stock_by_size?: Record<string, number> | null; variant_stock?: Record<string, Record<string, number>> | null; color_images?: Record<string, string> | null; video_url?: string | null;
   min_qty?: number | null; max_qty?: number | null; dispatch_time?: string | null; country_of_origin?: string | null;
   return_available?: boolean | null; exchange_available?: boolean | null; return_period?: string | null; return_policy?: string | null;
   mfr_name?: string | null; mfr_address?: string | null;
@@ -30,6 +30,7 @@ export const shape = (r: DbProduct) => ({
   modelInfo: r.model_info ?? "",
   sizes: r.sizes ?? [],
   sizeStock: r.stock_by_size ?? {},
+  variantStock: r.variant_stock ?? {},
   colors: r.colors ?? [],
   colorImages: r.color_images ?? {},
   video: r.video_url ?? "",
