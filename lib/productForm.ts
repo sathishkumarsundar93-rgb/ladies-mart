@@ -48,22 +48,39 @@ export function parseProduct(b: Record<string, unknown>): R {
   // sizes, stock, colours
   const fixed = FIXED1(category);
   let sizes: string[] = [], stockBySize: Record<string, number> = {}, colors: string[] = [];
+  let variantStock: Record<string, Record<string, number>> = {};
   if (fixed) {
     const st = int(b.stock, 0, 100000);
     if (st === null) return { error: "Enter the available stock" };
     sizes = ["Free Size"]; stockBySize = { "Free Size": st };
     colors = attrs.color && HEX[attrs.color] ? [attrs.color] : [];
   } else {
-    const inS = (b.stock_by_size && typeof b.stock_by_size === "object" ? b.stock_by_size : {}) as Record<string, unknown>;
-    sizes = FORM_SIZES.filter((z) => z in inS);
-    if (!sizes.length) return { error: "Choose at least one size" };
-    for (const z of sizes) {
-      const n = int(inS[z], 0, 100000);
-      if (n === null) return { error: `Enter stock for size ${z}` };
-      stockBySize[z] = n;
-    }
     colors = list(b.colors, Object.keys(HEX));
     if (!colors.length) return { error: "Choose at least one colour" };
+    if (colors.length > 1) {
+      // same design in several colours: separate stock for every colour and size
+      const inV = (b.variant_stock && typeof b.variant_stock === "object" ? b.variant_stock : {}) as Record<string, Record<string, unknown>>;
+      sizes = FORM_SIZES.filter((z) => colors.every((c) => inV[c] && typeof inV[c] === "object" && z in inV[c]));
+      if (!sizes.length) return { error: "Choose at least one size" };
+      for (const c of colors) {
+        variantStock[c] = {};
+        for (const z of sizes) {
+          const n = int(inV[c][z], 0, 100000);
+          if (n === null) return { error: `Enter stock for ${c} size ${z}` };
+          variantStock[c][z] = n;
+          stockBySize[z] = (stockBySize[z] ?? 0) + n;
+        }
+      }
+    } else {
+      const inS = (b.stock_by_size && typeof b.stock_by_size === "object" ? b.stock_by_size : {}) as Record<string, unknown>;
+      sizes = FORM_SIZES.filter((z) => z in inS);
+      if (!sizes.length) return { error: "Choose at least one size" };
+      for (const z of sizes) {
+        const n = int(inS[z], 0, 100000);
+        if (n === null) return { error: `Enter stock for size ${z}` };
+        stockBySize[z] = n;
+      }
+    }
   }
   const stock = Object.values(stockBySize).reduce((a, n) => a + n, 0);
 
@@ -124,10 +141,10 @@ export function parseProduct(b: Record<string, unknown>): R {
     price, old_price: mrp, purchase_price: buy, hsn: hsn || null, gst_rate: gst || null, min_qty: minQ, max_qty: maxQ,
     image: slots.main, images: slotKeys.filter((k) => slots[k]).map((k) => slots[k]),
     image_slots: JSON.stringify(slots), color_images: JSON.stringify(colorImages), video_url: video,
-    sizes, colors, stock_by_size: JSON.stringify(stockBySize), stock,
+    sizes, colors, stock_by_size: JSON.stringify(stockBySize), variant_stock: JSON.stringify(variantStock), stock,
     weight_g: Math.round(kg * 1000), pkg_length_cm: dims[0], pkg_width_cm: dims[1], pkg_height_cm: dims[2],
     dispatch_time: dispatch, country_of_origin: origin,
     return_available: retAv, exchange_available: exch, return_period: retAv ? retPer : null,
     return_policy: str(b.return_policy, 400) || null, mfr_name: mfr, mfr_address: mfrAddr,
   } };
-}
+    }
