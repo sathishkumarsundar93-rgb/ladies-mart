@@ -5,7 +5,7 @@ export type Product = {
   id: number; name: string; cat: string; price: number; old: number; image: string; off: string; stock?: number;
   images?: string[]; sub?: string; description?: string; sizes?: string[]; colors?: string[];
   type?: string; brand?: string; highlights?: string[]; attributes?: Record<string, string>; packageContents?: string; composition?: string; modelInfo?: string;
-  sizeStock?: Record<string, number>; colorImages?: Record<string, string>; video?: string; minQty?: number; maxQty?: number;
+  sizeStock?: Record<string, number>; variantStock?: Record<string, Record<string, number>>; colorImages?: Record<string, string>; video?: string; minQty?: number; maxQty?: number;
   dispatch?: string; origin?: string; returnAvailable?: boolean; exchangeAvailable?: boolean; returnPeriod?: string; returnPolicy?: string; mfrName?: string; mfrAddress?: string;
 };
 
@@ -33,4 +33,4 @@ export function useProducts() {
     return () => { alive = false; };
   }, []);
   return { products, fromApi, loading };
-}
+   }
