@@ -26,3 +26,22 @@
 .pd-sim img{width:140px;height:175px;object-fit:cover;border-radius:10px;display:block;margin-bottom:4px}
 .pd-sim b{display:block}
 @media(prefers-reduced-motion:reduce){.pd-dots span{transition:none}}
+
+/* Seller-uploaded colour variants displayed as selectable similar-product cards */
+.pd-variant-list{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:4px 2px 10px;margin:4px 0 12px}
+.pd-variant-list::-webkit-scrollbar{display:none}
+.pd-variant-card{flex:0 0 88px;min-width:0;padding:0 0 5px;border:2px solid transparent;border-radius:9px;background:#fff;color:inherit;text-align:center;cursor:pointer;overflow:hidden;font:inherit}
+.pd-variant-card.on{border-color:#a3238e}
+.pd-variant-card img{display:block;width:100%;height:112px;object-fit:cover}
+.pd-variant-card span{display:block;padding:5px 2px 0;font-size:12px;font-weight:600}
+.pd-variant-swatch{flex:0 0 76px;border:1px solid #eadde8;border-radius:9px;background:#fff;padding:8px 4px;display:grid;justify-items:center;gap:6px;cursor:pointer;color:inherit}
+.pd-variant-swatch.on{outline:2px solid #a3238e}
+.pd-variant-swatch span{width:34px;height:34px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #ddd}
+.pd-variant-swatch b{font-size:11px}
+.pd-slidewrap{position:relative}
+.pd-more{position:absolute;right:14px;bottom:14px;z-index:2;background:#fff;border:1px solid #f0dbe4;border-radius:22px;padding:9px 16px;font-weight:700;color:#3a1030;box-shadow:0 4px 14px rgba(0,0,0,.14);cursor:pointer;font-family:inherit}
+.pd-variant-wrap{position:relative}
+.pd-next{position:absolute;right:0;top:42%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:0;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.22);font-size:22px;line-height:1;cursor:pointer;color:#3a1030}
+.pd-info{background:none;border:0;color:#7b6571;font-size:17px;cursor:pointer;vertical-align:middle;padding:0 4px}
+.pd-price-box{background:#fff0f6;border:1px solid #f0dbe4;border-radius:12px;padding:8px 14px;margin:8px 0;font-size:14px}
+.pd-price-box div{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
