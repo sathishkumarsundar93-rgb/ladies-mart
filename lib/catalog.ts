@@ -1,7 +1,7 @@
 export type Spec = [string, string, "s" | "c" | "y" | "n", (string[] | string | number)?, (0 | 1)?, Record<string, string>?];
 
 export const COL: string[] = ["Pink","Purple","Blue","Red","Green","Orange","Yellow","Maroon","Black","White","Grey","Brown","Gold","Cream","Navy","Teal","Peach","Multicolour"];
-export const HEX: Record<string, string> = {Pink:"#e0107a",Purple:"#7c3aed",Blue:"#3b82f6",Red:"#e11d2a",Green:"#3f9b4a",Orange:"#f59e0b",Yellow:"#facc15",Maroon:"#7a0a24",Black:"#222",White:"#f4f4f4",Grey:"#9ca3af",Brown:"#8b5a2b",Gold:"#d4a017",Cream:"#f5e6c8",Navy:"#1e3a8a",Teal:"#0f9b8e",Peach:"#ffb48f",Multicolour:"conic-gradient(#e0107a,#f59e0b,#3f9b4a,#3b82f6,#7c3aed,#e0107a)"};
+export const HEX: Record<string, string> = {Pink:"#e0107a",Purple:"#7c3aed",Blue:"#3b82f6",Red:"#e11d2a",Green:"#3f9b4a",Orange:"#f59e0b",Yellow:"#facc15",Maroon:"#7a0a24",Black:"#222",White:"#f4f4f4",Grey:"#9ca3af",Brown:"#8b5a2b",Gold:"#d4a017",Cream:"#f5e6c8",Navy:"#1e3a8a",Teal:"#0f9b8e",Peach:"#ffb48f","Light Blue":"#9ec5f4","Sky Blue":"#87ceeb",Charcoal:"#374151",Olive:"#708238",Mustard:"#e0a800",Lavender:"#b9a2e8",Mint:"#98e0c1",Beige:"#e6d3b3",Wine:"#722f37",Turquoise:"#2dc4c0","Lime Green":"#a3d63a",Silver:"#c0c0c0",Coffee:"#6f4e37",Multicolour:"conic-gradient(#e0107a,#f59e0b,#3f9b4a,#3b82f6,#7c3aed,#e0107a)"};
 const WASH=["Dry clean only","Hand wash","Machine wash","Gentle machine wash"],PAT=["Solid","Printed","Woven design","Embroidered","Striped","Checked","Floral","Zari work","Abstract"],WORK=["None","Zari","Embroidery","Sequin","Stone work","Mirror work","Block print","Thread work"];
 const NECK=["Round","V-neck","Collar","Boat","Square","Keyhole"],SLV=["Sleeveless","Short sleeve","3/4 sleeve","Full sleeve"],FIT=["Regular","Slim","Relaxed"],STITCH=["Stitched","Semi-stitched","Unstitched"];
 const FAB=["Cotton","Rayon","Georgette","Silk blend","Linen","Crepe","Chanderi","Polyester","Other"];
@@ -17,7 +17,10 @@ Nightwear:[["fabric","Fabric","s",["Cotton","Rayon","Satin","Poly-cotton","Modal
 export const SUBCATS: Record<string, string[]> = {Sarees:["Silk","Cotton","Designer","Party wear"],Kurtis:["Straight","A-line","Anarkali","Printed"],Dresses:["Maxi","Midi","Party","Casual"],Tops:["Crop","Casual","Formal"],Jeans:["Straight","Wide-leg","Skinny"],"Ethnic Wear":["Lehenga","Salwar set","Palazzo set"],Nightwear:["Night suit","Gown","Co-ord set"],"Dress Material":["Cotton","Silk","Georgette","Printed"]};
 export const PTYPE: Record<string, string[]> = {Sarees:["Saree with blouse piece","Plain saree","Ready-to-wear saree"],Kurtis:["Kurti","Long kurta","Tunic"],Dresses:["Dress","Gown","Jumpsuit"],Tops:["Shirt","Top","T-shirt","Tunic","Crop top"],Jeans:["Jeans","Jeggings","Trousers","Palazzo"],"Ethnic Wear":["Lehenga set","Salwar set","Palazzo set","Sharara set","Gown"],Nightwear:["Night suit","Gown","Co-ord set","Shorts set"],"Dress Material":["Unstitched dress material"]};
 export const OCC = ["Daily wear","Office","Festive","Party","Wedding","Casual"];
-export const FORM_SIZES = ["XS","S","M","L","XL","XXL"];
+export const FORM_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"];
+export const JEANS_SIZES = ["26", "28", "30", "32", "34", "36", "38", "40", "42"];
+// sizes a seller can offer for each category (jeans use waist sizes)
+export const sizeOptions = (c: string) => (c === "Jeans" ? JEANS_SIZES : FORM_SIZES);
 export const SLOTS = (c: string): [string, string, number?][] => {
   const s: [string, string, number?][] = [["main", "Main image", 1], ["front", "Front view"], ["back", "Back view"]];
   if (c === "Sarees") s.push(["border", "Border close-up"], ["pallu", "Pallu"], ["blouse", "Blouse piece"]);
@@ -27,7 +30,7 @@ export const SLOTS = (c: string): [string, string, number?][] => {
 export const FIXED1 = (c: string) => c=="Sarees"||c=="Dress Material";
 
 export const CATEGORIES = Object.keys(SUBCATS);
-export const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"];
+export const SIZES = [...FORM_SIZES, ...JEANS_SIZES, "Free Size"];
 export const COLOURS = HEX;
 
 // Products with several sizes or any colour need the customer to choose first
