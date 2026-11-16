@@ -1,4 +1,4 @@
-import { FIXED1, FORM_SIZES, HEX, OCC, PTYPE, SLOTS, SPEC, SUBCATS } from "./catalog";
+import { FIXED1, HEX, OCC, PTYPE, SLOTS, SPEC, SUBCATS, sizeOptions } from "./catalog";
 
 export const DISPATCH = ["1-2 days", "3 days", "5 days", "7 days"];
 export const ORIGINS = ["India", "China", "Bangladesh", "Other"];
@@ -60,7 +60,7 @@ export function parseProduct(b: Record<string, unknown>): R {
     if (colors.length > 1) {
       // same design in several colours: separate stock for every colour and size
       const inV = (b.variant_stock && typeof b.variant_stock === "object" ? b.variant_stock : {}) as Record<string, Record<string, unknown>>;
-      sizes = FORM_SIZES.filter((z) => colors.every((c) => inV[c] && typeof inV[c] === "object" && z in inV[c]));
+      sizes = sizeOptions(category).filter((z) => colors.every((c) => inV[c] && typeof inV[c] === "object" && z in inV[c]));
       if (!sizes.length) return { error: "Choose at least one size" };
       for (const c of colors) {
         variantStock[c] = {};
@@ -73,7 +73,7 @@ export function parseProduct(b: Record<string, unknown>): R {
       }
     } else {
       const inS = (b.stock_by_size && typeof b.stock_by_size === "object" ? b.stock_by_size : {}) as Record<string, unknown>;
-      sizes = FORM_SIZES.filter((z) => z in inS);
+      sizes = sizeOptions(category).filter((z) => z in inS);
       if (!sizes.length) return { error: "Choose at least one size" };
       for (const z of sizes) {
         const n = int(inS[z], 0, 100000);
@@ -147,4 +147,4 @@ export function parseProduct(b: Record<string, unknown>): R {
     return_available: retAv, exchange_available: exch, return_period: retAv ? retPer : null,
     return_policy: str(b.return_policy, 400) || null, mfr_name: mfr, mfr_address: mfrAddr,
   } };
-    }
+}
