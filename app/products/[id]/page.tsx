@@ -8,14 +8,14 @@ import PageShell from "../../components/PageShell";
 import Md from "../../components/Md";
 import { useProducts } from "../../components/useProducts";
 import { imageUrl } from "../../../lib/image";
-import { COLOURS, SIZES, SPEC } from "../../../lib/catalog";
+import { COLOURS, FORM_SIZES, SPEC } from "../../../lib/catalog";
 import { useCart, FREE_SHIPPING_MIN, SHIPPING_FEE } from "../../components/CartContext";
 
 export default function ProductDetail(){
  const params=useParams(); const router=useRouter(); const { products }=useProducts();
  const product=products.find(p=>p.id===Number(params.id))||products[0];
  const sized=!!product.sizeStock&&Object.keys(product.sizeStock).length>0;
- const sizes=product.sizes&&product.sizes.length?product.sizes:SIZES.filter(s=>s!=="Free Size");
+ const sizes=product.sizes&&product.sizes.length?product.sizes:FORM_SIZES.slice(0,6);
  const vs=product.variantStock&&Object.keys(product.variantStock).length>0?product.variantStock:null;
  const stockFor=(s:string,c:string)=>vs?(c?(vs[c]?.[s]??0):Object.values(vs).reduce((n,row)=>n+(row[s]??0),0)):sized?(product.sizeStock![s]??0):(product.stock??99);
  const colors=useMemo(()=>product.colors??[],[product.colors]);
