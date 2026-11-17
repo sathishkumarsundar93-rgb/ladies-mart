@@ -4,6 +4,16 @@ import { getSeller } from "../../../../../lib/sellerAuth";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const s = await getSeller();
+  if (!s) return NextResponse.json({ error: "Please login" }, { status: 401 });
+  const id = Number(params.id);
+  if (!Number.isInteger(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  const { rows } = await pool.query("SELECT * FROM products WHERE id = $1 AND seller_id = $2", [id, s.id]);
+  if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(rows[0]);
+}
+
 type Body = { price?: number; old_price?: number; active?: boolean; stock?: number; stock_by_size?: Record<string, number>; variant_stock?: Record<string, Record<string, number>> };
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
