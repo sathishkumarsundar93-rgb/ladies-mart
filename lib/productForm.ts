@@ -15,7 +15,7 @@ const int = (v: unknown, min: number, max: number) => { const n = num(v); return
 const list = (v: unknown, allowed: string[], max = 20) =>
   Array.isArray(v) ? [...new Set(v.map(String))].filter((x) => allowed.includes(x)).slice(0, max) : [];
 
-export function parseProduct(b: Record<string, unknown>): R {
+export function parseProduct(b: Record<string, unknown>, opts: { minPhotos?: number } = {}): R {
   const category = str(b.category, 40), sub = str(b.sub_category, 40), ptype = str(b.product_type, 60);
   if (!SUBCATS[category]) return { error: "Choose a category" };
   if (!SUBCATS[category].includes(sub)) return { error: "Choose a sub category" };
@@ -90,7 +90,8 @@ export function parseProduct(b: Record<string, unknown>): R {
   const slots: Record<string, string> = {};
   for (const k of slotKeys) if (isCloud(inI[k])) slots[k] = inI[k] as string;
   if (!slots.main) return { error: "Upload the main image" };
-  if (Object.keys(slots).length < 3) return { error: "Upload at least 3 photos (main + 2 more)" };
+  const minPhotos = opts.minPhotos ?? 3;
+  if (Object.keys(slots).length < minPhotos) return { error: minPhotos >= 3 ? "Upload at least 3 photos (main + 2 more)" : "Upload at least one photo" };
   const colorImages: Record<string, string> = {};
   if (colors.length > 1) {
     const inC = (b.color_images && typeof b.color_images === "object" ? b.color_images : {}) as Record<string, unknown>;
@@ -147,4 +148,4 @@ export function parseProduct(b: Record<string, unknown>): R {
     return_available: retAv, exchange_available: exch, return_period: retAv ? retPer : null,
     return_policy: str(b.return_policy, 400) || null, mfr_name: mfr, mfr_address: mfrAddr,
   } };
-}
+  }
