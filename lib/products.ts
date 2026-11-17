@@ -8,7 +8,7 @@ export type DbProduct = {
   stock_by_size?: Record<string, number> | null; variant_stock?: Record<string, Record<string, number>> | null; color_images?: Record<string, string> | null; video_url?: string | null;
   min_qty?: number | null; max_qty?: number | null; dispatch_time?: string | null; country_of_origin?: string | null;
   return_available?: boolean | null; exchange_available?: boolean | null; return_period?: string | null; return_policy?: string | null;
-  mfr_name?: string | null; mfr_address?: string | null;
+  mfr_name?: string | null; mfr_address?: string | null; group_id?: number | null;
 };
 
 export const shape = (r: DbProduct) => ({
@@ -44,6 +44,7 @@ export const shape = (r: DbProduct) => ({
   returnPolicy: r.return_policy ?? "",
   mfrName: r.mfr_name ?? "",
   mfrAddress: r.mfr_address ?? "",
+  groupId: r.group_id ?? null,
   off: Math.round((1 - r.price / r.old_price) * 100) + "% OFF",
   stock: r.stock,
 });
