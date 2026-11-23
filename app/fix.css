@@ -1,0 +1,4 @@
+/* stop the page from sliding sideways and showing white space on the right */
+html{overflow-x:hidden}
+body{overflow-x:clip;max-width:100%;overscroll-behavior-x:none}
+.hm,.sp,.inner-page{max-width:100vw;overflow-x:clip}
