@@ -132,3 +132,6 @@ background:var(--bg);background-attachment:fixed;color:var(--ink);font:15px/1.45
 @media(max-width:860px){.sp .sp-app{grid-template-columns:1fr}.sp .sp-side{position:static;height:auto;flex-direction:row;overflow-x:auto;padding:8px;gap:4px}.sp .sp-side .sp-lg,.sp .sp-side .sp-promo{display:none}.sp .sp-side button{white-space:nowrap;padding:8px 12px}.sp .sp-bar{left:0;flex-wrap:wrap}.sp .sp-state{width:100%;text-align:center}.sp .sp-bar button{flex:1}.sp .sp-who span{display:none}}
 @media(max-width:560px){.sp .sp-fg{grid-template-columns:1fr}.sp .sp-slots{grid-template-columns:repeat(3,1fr)}.sp .sp-hd h1{font-size:20px}.sp .sp-gl{margin-left:0}}
 .sp .sp-vrow{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--line)}.sp .sp-vname{font-weight:700;display:flex;align-items:center;gap:8px}.sp .sp-vname i{width:16px;height:16px;border-radius:50%;display:inline-block;border:1px solid var(--line)}
+
+/* uploaded photos show the picture only, no caption tag */
+.sp .sp-slot b{display:none}
