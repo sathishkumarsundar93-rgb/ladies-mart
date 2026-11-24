@@ -148,4 +148,4 @@ export function parseProduct(b: Record<string, unknown>, opts: { minPhotos?: num
     return_available: retAv, exchange_available: exch, return_period: retAv ? retPer : null,
     return_policy: str(b.return_policy, 400) || null, mfr_name: mfr, mfr_address: mfrAddr,
   } };
-  }
+}
