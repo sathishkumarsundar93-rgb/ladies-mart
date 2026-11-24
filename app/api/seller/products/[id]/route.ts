@@ -80,4 +80,4 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     console.error(e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   } finally { client.release(); }
-}
+          }
