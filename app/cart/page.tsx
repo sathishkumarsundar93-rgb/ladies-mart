@@ -1,4 +1,4 @@
-"use client";,
+"use client";
 import Link from "next/link";
 import PageShell from "../components/PageShell";
 import { useCart, FREE_SHIPPING_MIN } from "../components/CartContext";
