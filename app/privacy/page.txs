@@ -1,0 +1,11 @@
+import PolicyPage from "../components/PolicyPage";
+
+export default function Privacy() {
+  return (
+    <PolicyPage title="Privacy policy">
+      <p>We collect the details you give us to place and deliver an order: name, phone number, address and pincode.</p>
+      <p>We use these details only to process orders, deliver them and contact you about your order.</p>
+      <p>[Data retention period, third parties we share data with (delivery partner, payment partner), and contact for privacy requests: to be added by the business and reviewed by a lawyer.]</p>
+    </PolicyPage>
+  );
+}
