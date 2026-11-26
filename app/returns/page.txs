@@ -1,0 +1,13 @@
+import PolicyPage from "../components/PolicyPage";
+
+export default function Returns() {
+  return (
+    <PolicyPage title="Returns and refunds">
+      <p>Return window: [number of days, to be decided by the business].</p>
+      <p>Which items can be returned: [to be decided, for example unused items with tags, damaged or wrong items].</p>
+      <p>Exchange: [available or not, and for which items].</p>
+      <p>Refund method and timeline for cash on delivery orders: [to be decided].</p>
+      <p>To start a return, message us on WhatsApp with your order number.</p>
+    </PolicyPage>
+  );
+}
