@@ -1,0 +1,12 @@
+import PolicyPage from "../components/PolicyPage";
+
+export default function Shipping() {
+  return (
+    <PolicyPage title="Shipping">
+      <p>Free shipping on orders above ₹999 [confirm threshold and rate with the delivery partner].</p>
+      <p>Cash on delivery is available where your pincode is serviceable [confirm coverage list with the delivery partner].</p>
+      <p>Delivery time: [to be confirmed by the delivery partner, per city and per region].</p>
+      <p>Orders are dispatched after confirmation. [Dispatch time to be confirmed].</p>
+    </PolicyPage>
+  );
+}
