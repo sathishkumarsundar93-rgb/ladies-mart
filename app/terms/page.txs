@@ -1,0 +1,12 @@
+import PolicyPage from "../components/PolicyPage";
+
+export default function Terms() {
+  return (
+    <PolicyPage title="Terms of use">
+      <p>By using this website you agree to these terms. [Full terms to be written and reviewed by a lawyer before launch.]</p>
+      <p>Product images and descriptions are for guidance. Colours may look slightly different on screen.</p>
+      <p>Prices and offers can change. The price shown at checkout is the price you pay.</p>
+      <p>[Governing law, dispute process, and limits of liability: to be added.]</p>
+    </PolicyPage>
+  );
+}
